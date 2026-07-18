@@ -170,6 +170,15 @@ async function getFullFleetState(): Promise<FleetDatabase> {
         type: adv.type as any
       }));
 
+    const dDocs = allDocs
+      .filter(doc => doc.plateNumber === `DRIVER_${d.id}` || (d.assignedVehiclePlate && doc.plateNumber === d.assignedVehiclePlate && (doc.type === "License" || doc.type === "Salary")))
+      .map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        type: (doc.type === "License" || doc.type === "Aadhaar" || doc.type === "Medical" ? doc.type : "Other") as any,
+        uploadedAt: doc.uploadedAt ? doc.uploadedAt.toISOString().split("T")[0] : "2026-07-17"
+      }));
+
     return {
       id: d.id,
       name: d.name,
@@ -185,7 +194,7 @@ async function getFullFleetState(): Promise<FleetDatabase> {
       attendanceStatus: d.attendanceStatus as any,
       attendanceHistory: dAttendance,
       advanceHistory: dAdvances,
-      documents: [] as any[]
+      documents: dDocs
     };
   });
 
@@ -602,6 +611,16 @@ app.post("/api/drivers/:id/document", async (req, res) => {
       return res.status(404).json({ error: "Driver not found" });
     }
 
+    const dPlate = driverResult[0].assignedVehiclePlate || `DRIVER_${driverResult[0].id}`;
+    const docId = `doc_dr_${Date.now()}`;
+    await db.insert(vehicleDocuments).values({
+      id: docId,
+      plateNumber: dPlate,
+      name: name || `${type.toLowerCase()}_manual_upload.jpg`,
+      type: type,
+      url: ""
+    });
+
     await db.insert(notifications).values({
       id: `nt_dr_doc_${Date.now()}`,
       title: "Driver Document Logged",
@@ -960,6 +979,89 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
       });
 
       successMessage = `Logged completed trip for vehicle ${finalPlate}. Driver is ${parsed.driverName || "Fleet Driver"}.`;
+      break;
+    }
+
+    case "LICENSE": {
+      // Scanned driving license
+      let matchedDriver = null;
+      const dName = parsed.driverName || "";
+      const dLic = parsed.invoiceNumber || parsed.licenseNumber || "";
+
+      if (dName) {
+        const drvs = await db.select().from(drivers);
+        matchedDriver = drvs.find(d => d.name.toLowerCase().includes(dName.toLowerCase()));
+      }
+      if (!matchedDriver && dLic) {
+        const drvs = await db.select().from(drivers).where(eq(drivers.licenseNumber, dLic)).limit(1);
+        if (drvs.length > 0) matchedDriver = drvs[0];
+      }
+
+      if (matchedDriver) {
+        await db.update(drivers)
+          .set({
+            licenseNumber: dLic || matchedDriver.licenseNumber,
+            licenseExpiry: parsed.expiryDate || "2029-12-31"
+          })
+          .where(eq(drivers.id, matchedDriver.id));
+
+        await db.insert(vehicleDocuments).values({
+          id: docId,
+          plateNumber: matchedDriver.assignedVehiclePlate || finalPlate,
+          name: fileName || "driving_license.jpg",
+          type: "License",
+          url: ""
+        });
+
+        successMessage = `Scanned DL for ${matchedDriver.name}. Number: ${dLic || matchedDriver.licenseNumber}. Expiry updated to ${parsed.expiryDate || "2029-12-31"}.`;
+      } else {
+        successMessage = `Scanned Driving License document (No: ${dLic || "N/A"}, Expiry: ${parsed.expiryDate || "2029-12-31"}). No matching registered driver found in registry.`;
+      }
+      break;
+    }
+
+    case "SALARY": {
+      // Scanned salary or wage voucher/receipt
+      let matchedDriver = null;
+      const dName = parsed.driverName || "";
+
+      if (dName) {
+        const drvs = await db.select().from(drivers);
+        matchedDriver = drvs.find(d => d.name.toLowerCase().includes(dName.toLowerCase()));
+      }
+
+      if (matchedDriver) {
+        const isRepay = parsed.summary?.toLowerCase().includes("repay") || parsed.summary?.toLowerCase().includes("return") || parsed.summary?.toLowerCase().includes("deduct") || parsed.summary?.toLowerCase().includes("refund");
+        const amountVal = cost || 5000;
+
+        await db.insert(driverAdvances).values({
+          id: `adv_${Date.now()}`,
+          driverId: matchedDriver.id,
+          date: dateStr,
+          amount: String(amountVal),
+          description: parsed.summary || `Parsed salary receipt / payment voucher`,
+          type: isRepay ? "repayment" : "advance"
+        });
+
+        const currentAdvance = Number(matchedDriver.advance);
+        const netChange = isRepay ? -amountVal : amountVal;
+
+        await db.update(drivers)
+          .set({ advance: String(Math.max(0, currentAdvance + netChange)) })
+          .where(eq(drivers.id, matchedDriver.id));
+
+        await db.insert(vehicleDocuments).values({
+          id: docId,
+          plateNumber: matchedDriver.assignedVehiclePlate || finalPlate,
+          name: fileName || "salary_voucher.jpg",
+          type: "Salary",
+          url: ""
+        });
+
+        successMessage = `Parsed Salary Voucher for ${matchedDriver.name}. Logged ${isRepay ? 'repayment' : 'advance payment'} of Rs. ${amountVal}. Outstanding advance: Rs. ${Math.max(0, currentAdvance + netChange)}.`;
+      } else {
+        successMessage = `Scanned Salary Voucher of Rs. ${cost}. No matching registered driver found.`;
+      }
       break;
     }
 
