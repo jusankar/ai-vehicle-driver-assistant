@@ -1,0 +1,6 @@
+{
+  "name": "AI Vehicle & Driver Assistant",
+  "description": "An AI-powered mobile-first fleet assistant that allows truck and fleet owners to manage vehicles, driver schedules, fuel fills, and expenses entirely through a ChatGPT-style conversational assistant.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
