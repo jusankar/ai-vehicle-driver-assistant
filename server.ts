@@ -47,7 +47,7 @@ const PORT = 3000;
 
 // Initialize GoogleGenAI SDK with environment key
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey: process.env.GEMINI_API_KEY || "",
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
@@ -1699,13 +1699,6 @@ app.post("/api/scheduler/run", async (req, res) => {
 
 // Serve frontend static assets in production, hook Vite dev server in development
 async function startServer() {
-  // Trigger initial database seeding to populate empty database tables & knowledge base
-  try {
-    await seedDatabase();
-  } catch (err) {
-    console.error("Initial database seeding failed:", err);
-  }
-
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -1722,6 +1715,11 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`AI Vehicle & Driver Assistant server running on http://localhost:${PORT}`);
+  });
+
+  // Trigger initial database seeding asynchronously after port 3000 is listening
+  seedDatabase().catch((err) => {
+    console.error("Initial database seeding failed:", err);
   });
 }
 

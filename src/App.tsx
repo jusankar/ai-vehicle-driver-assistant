@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   Smartphone, 
   MessageSquare, 
@@ -32,11 +33,31 @@ import {
   Search,
   Calendar,
   Wallet,
-  Activity
+  Activity,
+  Sun,
+  Moon,
+  Wifi,
+  WifiOff,
+  CloudUpload,
+  HardDriveDownload,
+  Database
 } from "lucide-react";
 import { FleetDatabase, ChatMessage, Vehicle, Driver, FuelLog, ExpenseLog, NotificationItem } from "./types";
 import { flutterProjectFiles, FlutterFile } from "./flutterCode";
 import ReportsView from "./components/ReportsView";
+import { 
+  uploadCloudDocument, 
+  submitExpenseLog, 
+  confirmDocumentData, 
+  autoSyncPendingQueue, 
+  setSimulatedOfflineMode, 
+  getIsOffline 
+} from "./services/apiService";
+import { 
+  getPendingItems, 
+  clearPendingQueue, 
+  PendingSyncItem 
+} from "./services/offlineSync";
 
 // Browser SpeechRecognition definition
 interface IWindow extends Window {
@@ -49,6 +70,129 @@ export default function App() {
   // Mobile Simulator State
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'fleet' | 'drivers' | 'vault' | 'reminders' | 'reports'>('home');
   const [fleet, setFleet] = useState<FleetDatabase | null>(null);
+
+  // Material 3 Theme Toggle State (Light Day / High-Contrast Dark Night Mode for Fleet Management)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem("fleet_theme") === "dark";
+  });
+
+  // Service Worker Offline Sync & Pending Storage State
+  const [isOffline, setIsOfflineState] = useState<boolean>(false);
+  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
+  const [pendingSyncItems, setPendingSyncItems] = useState<PendingSyncItem[]>([]);
+  const [isSyncingQueue, setIsSyncingQueue] = useState<boolean>(false);
+  const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
+  const [syncProgressMsg, setSyncProgressMsg] = useState<string>("");
+
+  const refreshPendingQueue = async () => {
+    try {
+      const items = await getPendingItems();
+      setPendingSyncItems(items);
+    } catch (err) {
+      console.error("Failed to load pending sync queue", err);
+    }
+  };
+
+  const handleToggleSimulatedOffline = (offline: boolean) => {
+    setIsSimulatedOffline(offline);
+    setSimulatedOfflineMode(offline);
+    setIsOfflineState(offline || (typeof navigator !== 'undefined' ? !navigator.onLine : false));
+    if (offline) {
+      triggerToast("⚡ Offline Simulation Enabled! Document uploads & expense submissions will queue in Service Worker.");
+    } else {
+      triggerToast("🌐 Online Mode Restored! Triggering automatic Service Worker sync...");
+      handleManualSync();
+    }
+  };
+
+  const handleManualSync = async () => {
+    setIsSyncingQueue(true);
+    setSyncProgressMsg("Processing cached IndexedDB queue via Service Worker...");
+    try {
+      const result = await autoSyncPendingQueue((msg) => setSyncProgressMsg(msg));
+      if (result.syncedCount > 0) {
+        if (result.updatedDatabase) {
+          setFleet(result.updatedDatabase);
+        } else {
+          await fetchFleetDatabase();
+        }
+        triggerToast(`🎉 Successfully synchronized ${result.syncedCount} queued document uploads and expense log submissions!`);
+      } else if (result.failedCount > 0) {
+        triggerToast(`⚠️ Sync attempt complete: ${result.failedCount} items waiting for server connection.`);
+      } else {
+        triggerToast("✅ All offline items are fully synchronized with PostgreSQL server!");
+      }
+      await refreshPendingQueue();
+    } catch (err) {
+      console.error("Error during manual sync", err);
+      triggerToast("❌ Connection error while synchronizing queue.");
+    } finally {
+      setIsSyncingQueue(false);
+      setSyncProgressMsg("");
+    }
+  };
+
+  const handleClearQueue = async () => {
+    if (!window.confirm("Are you sure you want to clear the pending offline sync queue?")) return;
+    await clearPendingQueue();
+    await refreshPendingQueue();
+    triggerToast("🗑️ Offline sync queue cleared.");
+  };
+
+  useEffect(() => {
+    refreshPendingQueue();
+
+    const handleOnlineStatus = async () => {
+      const offlineNow = getIsOffline();
+      setIsOfflineState(offlineNow);
+      if (!offlineNow) {
+        triggerToast("🌐 Connection restored! Auto-synchronizing Service Worker queue...");
+        setIsSyncingQueue(true);
+        const result = await autoSyncPendingQueue();
+        if (result.syncedCount > 0) {
+          if (result.updatedDatabase) {
+            setFleet(result.updatedDatabase);
+          } else {
+            fetchFleetDatabase();
+          }
+          triggerToast(`🚀 Auto-synchronized ${result.syncedCount} offline uploads & expenses!`);
+        }
+        setIsSyncingQueue(false);
+        refreshPendingQueue();
+      }
+    };
+
+    const handleOfflineStatus = () => {
+      setIsOfflineState(true);
+      triggerToast("⚡ Device is now OFFLINE. Submissions will cache in Service Worker IndexedDB!");
+    };
+
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOfflineStatus);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_ONLINE_SYNC_REQUEST') {
+          handleOnlineStatus();
+        }
+      });
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOfflineStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("fleet_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("fleet_theme", "light");
+    }
+  }, [isDarkMode]);
 
   // Centralized Reminder Engine States
   const [showReminderModal, setShowReminderModal] = useState(false);
@@ -534,15 +678,9 @@ export default function App() {
     e.preventDefault();
     setIsUploading(true);
     
-    setUploadProgressMsg("Initializing TLS handshake with secure cloud storage servers...");
-    await new Promise(r => setTimeout(r, 600));
-    setUploadProgressMsg("Validating file signatures & checking metadata parameters...");
-    await new Promise(r => setTimeout(r, 600));
-    setUploadProgressMsg("Encrypting document package using military-grade AES-256...");
-    await new Promise(r => setTimeout(r, 500));
-    setUploadProgressMsg("Transmitting payload chunks to gs://fleet-cloud-bucket/...");
-    await new Promise(r => setTimeout(r, 800));
-    setUploadProgressMsg("Indexing document tags & finalizing cloud asset ledger...");
+    setUploadProgressMsg("Initializing Service Worker & checking connectivity status...");
+    await new Promise(r => setTimeout(r, 400));
+    setUploadProgressMsg("Transmitting payload to Cloud Vault / Service Worker cache...");
     await new Promise(r => setTimeout(r, 500));
 
     try {
@@ -552,35 +690,34 @@ export default function App() {
       const fileName = `${cleanType}_${randomId}.${extension}`;
       const mockSize = docUploadSource === 'PDF' ? "1.4 MB" : "620 KB";
 
-      const res = await fetch("/api/documents/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: fileName,
-          documentType: docUploadType,
-          source: docUploadSource,
-          notes: docNotes,
-          fileSize: mockSize,
-          fileData: capturedImage || undefined
-        })
-      });
+      const result = await uploadCloudDocument({
+        name: fileName,
+        documentType: docUploadType,
+        source: docUploadSource,
+        notes: docNotes,
+        fileSize: mockSize,
+        fileData: capturedImage || undefined
+      }, fleet);
 
-      if (res.ok) {
-        const data = await res.json();
-        setFleet(data.database);
-        setIsUploading(false);
-        setUploadProgressMsg("");
-        setDocNotes("");
-        setCapturedImage(null);
-        triggerToast(`🚀 ${docUploadType} uploaded and stored securely in Cloud Storage!`);
-      } else {
-        const err = await res.json();
-        alert(err.error || "Upload failed");
-        setIsUploading(false);
+      if (result.updatedDatabase) {
+        setFleet(result.updatedDatabase);
       }
+
+      setIsUploading(false);
+      setUploadProgressMsg("");
+      setDocNotes("");
+      setCapturedImage(null);
+
+      if (result.isOfflineQueued) {
+        triggerToast(`⚡ Offline Mode: Document "${fileName}" cached in Service Worker queue for auto-sync.`);
+      } else {
+        triggerToast(`🚀 ${docUploadType} uploaded and stored securely!`);
+      }
+
+      await refreshPendingQueue();
     } catch (err) {
       console.error("Cloud doc upload error", err);
-      alert("Error uploading file to server");
+      alert("Error processing file upload");
       setIsUploading(false);
     }
   };
@@ -656,6 +793,29 @@ export default function App() {
     }, 50);
 
     try {
+      if (getIsOffline()) {
+        const result = await submitExpenseLog({
+          plateNumber: "TN68AB1234",
+          amount: 500,
+          category: "Others",
+          description: query
+        }, fleet);
+
+        if (result.updatedDatabase) {
+          setFleet(result.updatedDatabase);
+        }
+
+        const offlineMsg: ChatMessage = {
+          id: `ai_offline_${Date.now()}`,
+          sender: "assistant",
+          text: `⚡ Device is currently OFFLINE.\n\nYour message/submission ("${query}") has been safely cached in the Service Worker queue! It will automatically synchronize with the database server once connectivity is restored.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, offlineMsg]);
+        await refreshPendingQueue();
+        return;
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -689,13 +849,26 @@ export default function App() {
         throw new Error("Failed to get response");
       }
     } catch (err) {
+      // Offline fallback
+      const result = await submitExpenseLog({
+        plateNumber: "TN68AB1234",
+        amount: 500,
+        category: "Others",
+        description: query
+      }, fleet);
+
+      if (result.updatedDatabase) {
+        setFleet(result.updatedDatabase);
+      }
+
       const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
         sender: "assistant",
-        text: "⚠️ I had trouble talking to the fleet server. Please check your network or try asking again.",
+        text: "⚡ Network connection unavailable. Request cached in Service Worker queue for auto-sync on reconnect.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, errorMsg]);
+      await refreshPendingQueue();
     } finally {
       setIsAiThinking(false);
       setTimeout(() => {
@@ -780,26 +953,27 @@ export default function App() {
   const handleConfirmDocument = async () => {
     if (!lowConfidenceDoc) return;
     setIsUploading(true);
-    setUploadProgressMsg("Saving verified document records to database...");
+    setUploadProgressMsg("Saving verified document records via Service Worker database layer...");
 
     try {
-      const response = await fetch("/api/confirm-document", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: lowConfidenceDoc.fileName,
-          data: verificationForm
-        })
-      });
+      const result = await confirmDocumentData({
+        fileName: lowConfidenceDoc.fileName,
+        data: verificationForm
+      }, fleet);
 
-      if (response.ok) {
-        const resData = await response.json();
-        setFleet(resData.currentDatabase);
-        setLowConfidenceDoc(null);
-        triggerToast("✅ Document successfully verified and saved to fleet log!");
-      } else {
-        alert("Failed to confirm document. Check fields and retry.");
+      if (result.updatedDatabase) {
+        setFleet(result.updatedDatabase);
       }
+
+      setLowConfidenceDoc(null);
+
+      if (result.isOfflineQueued) {
+        triggerToast(`⚡ ${result.message}`);
+      } else {
+        triggerToast("✅ Document successfully verified and saved to fleet log!");
+      }
+
+      await refreshPendingQueue();
     } catch (err) {
       console.error(err);
       alert("Error connection with server.");
@@ -846,25 +1020,73 @@ export default function App() {
   const JulyExpenses = getJulyExpenseTotal();
 
   return (
-    <div className="min-h-screen bg-[#F7F2FA] text-[#1C1B1F] font-sans flex flex-col md:flex-row overflow-hidden">
+    <div className={`min-h-screen font-sans flex flex-col md:flex-row overflow-hidden transition-colors duration-300 ${
+      isDarkMode ? 'bg-[#0F0D13] text-[#E6E0E9] dark' : 'bg-[#F7F2FA] text-[#1C1B1F]'
+    }`}>
       
       {/* LEFT PANEL: Interactive Material 3 Android Simulator */}
-      <div className="flex-1 p-4 md:p-6 lg:p-8 flex flex-col justify-center items-center border-b md:border-b-0 md:border-r border-[#CAC4D0] overflow-y-auto">
+      <div className={`flex-1 p-4 md:p-6 lg:p-8 flex flex-col justify-center items-center border-b md:border-b-0 md:border-r overflow-y-auto transition-colors ${
+        isDarkMode ? 'bg-[#141218] border-[#36343B]' : 'bg-[#F7F2FA] border-[#CAC4D0]'
+      }`}>
         <div className="w-full max-w-lg">
           
           {/* Header branding */}
-          <div className="text-center mb-4">
-            <h1 className="text-2xl font-bold tracking-tight text-[#1C1B1F] flex items-center justify-center gap-2">
-              <Sparkles className="w-6 h-6 text-[#6750A4]" />
+          <div className="text-center mb-3">
+            <h1 className={`text-2xl font-bold tracking-tight flex items-center justify-center gap-2 ${
+              isDarkMode ? 'text-[#E6E0E9]' : 'text-[#1C1B1F]'
+            }`}>
+              <Sparkles className={`w-6 h-6 ${isDarkMode ? 'text-[#D0BCFF]' : 'text-[#6750A4]'}`} />
               AI Vehicle & Driver Assistant
             </h1>
-            <p className="text-[#49454F] text-sm mt-1 font-medium">
+            <p className={`text-xs mt-1 font-medium ${isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'}`}>
               Live Interactive Prototype (Material 3 Mobile Shell)
             </p>
+
+            {/* Material 3 Segmented Theme Selector */}
+            <div className="mt-2.5 flex items-center justify-center">
+              <div className={`inline-flex items-center p-1 rounded-2xl border transition-all shadow-xs ${
+                isDarkMode 
+                  ? 'bg-[#2B2930] border-[#49454F] text-[#E6E0E9]' 
+                  : 'bg-[#E7E0EC] border-[#CAC4D0] text-[#1C1B1F]'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDarkMode(false);
+                    triggerToast("☀️ Standard Day Mode activated (Material 3 Light)");
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    !isDarkMode
+                      ? 'bg-[#6750A4] text-white shadow-sm scale-102'
+                      : isDarkMode ? 'text-[#CAC4D0] hover:text-white' : 'text-[#49454F] hover:text-[#1C1B1F]'
+                  }`}
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                  <span>Day Theme</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDarkMode(true);
+                    triggerToast("🌙 Night-Time Fleet Mode activated (Material 3 High-Contrast Dark)");
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    isDarkMode
+                      ? 'bg-[#D0BCFF] text-[#381E72] shadow-sm scale-102 font-extrabold'
+                      : 'text-[#49454F] hover:text-[#1C1B1F]'
+                  }`}
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                  <span>Night Mode (High Contrast)</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* THE PHYSICAL PHONE CONTAINER */}
-          <div className="relative mx-auto bg-[#1C1B1F] rounded-[3rem] p-4 shadow-2xl border-4 border-[#79747E] w-full max-w-sm aspect-[9/19] flex flex-col overflow-hidden ring-12 ring-[#EADDFF]">
+          <div className={`relative mx-auto bg-[#1C1B1F] rounded-[3rem] p-4 shadow-2xl border-4 w-full max-w-sm aspect-[9/19] flex flex-col overflow-hidden ring-12 transition-all ${
+            isDarkMode ? 'border-[#49454F] ring-[#4F378B]' : 'border-[#79747E] ring-[#EADDFF]'
+          }`}>
             
             {/* Phone notch */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#1C1B1F] rounded-b-xl z-50 flex items-center justify-center gap-1.5">
@@ -873,41 +1095,103 @@ export default function App() {
             </div>
 
             {/* Simulated Android Status Bar */}
-            <div className="flex justify-between px-6 pt-2 pb-3 text-[11px] font-medium text-[#49454F] select-none bg-[#F3EDF7] z-40">
-              <span className="font-semibold text-[#1C1B1F]">07:13 AM</span>
+            <div className={`flex justify-between px-6 pt-2 pb-3 text-[11px] font-medium select-none z-40 transition-colors ${
+              isDarkMode ? 'bg-[#211F26] text-[#CAC4D0]' : 'bg-[#F3EDF7] text-[#49454F]'
+            }`}>
+              <span className={`font-semibold ${isDarkMode ? 'text-[#E6E0E9]' : 'text-[#1C1B1F]'}`}>07:13 AM</span>
               <div className="flex items-center gap-1.5">
-                <span className="px-1 py-0.5 rounded bg-[#EADDFF] text-[#21005D] font-mono text-[9px] border border-[#CAC4D0]">2026-07-17</span>
-                <span className="w-2.5 h-2.5 bg-[#6750A4] rounded-sm inline-block"></span>
+                {isDarkMode && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-[#381E72] text-[#D0BCFF] font-bold text-[8px] border border-[#4F378B]">
+                    NIGHT
+                  </span>
+                )}
+                <span className={`px-1 py-0.5 rounded font-mono text-[9px] border ${
+                  isDarkMode 
+                    ? 'bg-[#2B2930] text-[#D0BCFF] border-[#49454F]' 
+                    : 'bg-[#EADDFF] text-[#21005D] border-[#CAC4D0]'
+                }`}>2026-07-17</span>
+                <span className={`w-2.5 h-2.5 rounded-sm inline-block ${isDarkMode ? 'bg-[#D0BCFF]' : 'bg-[#6750A4]'}`}></span>
                 <span>5G</span>
                 <span>94%</span>
               </div>
             </div>
 
             {/* SCREEN VIEWPORT */}
-            <div className="flex-1 bg-[#F7F2FA] rounded-[2rem] flex flex-col relative overflow-hidden text-[#1C1B1F]">
+            <div className={`flex-1 rounded-[2rem] flex flex-col relative overflow-hidden transition-colors ${
+              isDarkMode ? 'bg-[#141218] text-[#E6E0E9]' : 'bg-[#F7F2FA] text-[#1C1B1F]'
+            }`}>
               
               {/* Material 3 App Header */}
-              <div className="px-4 py-3 bg-[#F3EDF7] border-b border-[#CAC4D0] flex items-center justify-between shadow-sm">
+              <div className={`px-4 py-3 border-b flex items-center justify-between shadow-xs transition-colors ${
+                isDarkMode ? 'bg-[#211F26] border-[#36343B]' : 'bg-[#F3EDF7] border-[#CAC4D0]'
+              }`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#6750A4] flex items-center justify-center font-bold text-white shadow">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow ${
+                    isDarkMode ? 'bg-[#D0BCFF] text-[#381E72]' : 'bg-[#6750A4]'
+                  }`}>
                     AI
                   </div>
                   <div>
-                    <h2 className="text-sm font-semibold tracking-wide text-[#1C1B1F] leading-tight">AI Assistant</h2>
-                    <span className="text-[10px] text-[#0A301A] flex items-center gap-1 font-medium">
+                    <h2 className={`text-sm font-semibold tracking-wide leading-tight ${
+                      isDarkMode ? 'text-[#E6E0E9]' : 'text-[#1C1B1F]'
+                    }`}>AI Assistant</h2>
+                    <span className={`text-[10px] flex items-center gap-1 font-medium ${
+                      isDarkMode ? 'text-emerald-400' : 'text-[#0A301A]'
+                    }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Core Engine Online
+                      {isDarkMode ? 'Night Fleet Mode' : 'Core Engine Online'}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  {/* Service Worker Offline Sync Queue Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowSyncModal(true)}
+                    title="Service Worker Offline Sync Queue"
+                    className={`px-2 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 transition-all border ${
+                      pendingSyncItems.length > 0
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                        : isOffline
+                        ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                        : isDarkMode
+                        ? 'bg-[#2B2930] text-[#D0BCFF] border-[#49454F] hover:bg-[#36343B]'
+                        : 'bg-[#EADDFF] text-[#21005D] border-[#CAC4D0] hover:bg-[#E8DEF8]'
+                    }`}
+                  >
+                    {isOffline ? <WifiOff className="w-3 h-3 text-amber-400" /> : <Wifi className="w-3 h-3 text-emerald-500" />}
+                    <span>{pendingSyncItems.length > 0 ? `${pendingSyncItems.length} Sync` : 'SW Sync'}</span>
+                  </button>
+
+                  {/* Theme Mode Button in App Bar */}
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const nextMode = !isDarkMode;
+                      setIsDarkMode(nextMode);
+                      triggerToast(nextMode ? "🌙 High-Contrast Night Mode activated!" : "☀️ Standard Day Mode activated!");
+                    }}
+                    title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode (High Contrast)"}
+                    className={`p-1.5 rounded-full transition-colors ${
+                      isDarkMode 
+                        ? 'hover:bg-[#36343B] text-amber-300' 
+                        : 'hover:bg-[#E8DEF8] text-[#49454F]'
+                    }`}
+                  >
+                    {isDarkMode ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-[#6750A4]" />}
+                  </button>
+
                   {/* Notification Bell */}
                   <button 
                     onClick={() => setShowNotifications(prev => !prev)}
-                    className="p-1.5 rounded-full hover:bg-[#E8DEF8] text-[#49454F] relative transition-colors"
+                    className={`p-1.5 rounded-full relative transition-colors ${
+                      isDarkMode 
+                        ? 'hover:bg-[#36343B] text-[#CAC4D0]' 
+                        : 'hover:bg-[#E8DEF8] text-[#49454F]'
+                    }`}
                   >
-                    <Bell className="w-5 h-5" />
+                    <Bell className="w-4 h-4" />
                     {fleet && fleet.notifications.filter(n => !n.read).length > 0 && (
                       <span className="absolute top-1 right-1 w-2 h-2 bg-[#B3261E] rounded-full"></span>
                     )}
@@ -917,12 +1201,43 @@ export default function App() {
                   <button 
                     onClick={resetDatabase}
                     title="Reset Fleet Database"
-                    className="p-1.5 rounded-full hover:bg-[#E8DEF8] text-[#49454F] hover:text-[#1C1B1F] transition-colors"
+                    className={`p-1.5 rounded-full transition-colors ${
+                      isDarkMode 
+                        ? 'hover:bg-[#36343B] text-[#CAC4D0]' 
+                        : 'hover:bg-[#E8DEF8] text-[#49454F]'
+                    }`}
                   >
                     <RefreshCw className="w-4 h-4" />
                   </button>
                 </div>
               </div>
+
+              {/* Service Worker Offline Status Banner */}
+              {(isOffline || pendingSyncItems.length > 0) && (
+                <div className={`px-3 py-1.5 text-[11px] flex items-center justify-between font-medium border-b shadow-2xs transition-colors ${
+                  isOffline 
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
+                    : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                }`}>
+                  <div className="flex items-center gap-1.5">
+                    {isOffline ? (
+                      <WifiOff className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
+                    ) : (
+                      <HardDriveDownload className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {isOffline ? `Offline Mode (${pendingSyncItems.length} queued)` : `${pendingSyncItems.length} cached item(s) pending sync`}
+                    </span>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setShowSyncModal(true)}
+                    className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-2 py-0.5 rounded font-bold text-[10px] shrink-0 ml-1 shadow-2xs"
+                  >
+                    View Queue
+                  </button>
+                </div>
+              )}
 
               {/* Notification Drawer (Overlay modal inside Phone) */}
               {showNotifications && (
@@ -963,139 +1278,154 @@ export default function App() {
                   </div>
                 )}
 
-                {/* TAB 1: HOME PANEL */}
-                {activeTab === 'home' && (
-                  <div className="space-y-4 animate-fade-in flex-1">
-                    
-                    {/* Welcome Hero Grid Banner */}
-                    <div className="bg-gradient-to-br from-[#EADDFF] to-[#D8C9EF] p-4 rounded-2xl border border-[#CAC4D0] shadow-sm">
-                      <div className="flex items-center gap-1.5 text-[#21005D] text-[10px] font-bold uppercase tracking-wider mb-2">
-                        <Sparkles className="w-3.5 h-3.5 text-[#6750A4]" />
-                        AI-Powered Mobile Fleet
-                      </div>
-                      <h3 className="text-lg font-bold text-[#21005D] leading-tight">Your fleet is running healthy</h3>
-                      <p className="text-[#49454F] text-xs mt-1.5 leading-snug">
-                        All 4 heavy trucks online. 1 schedule alarm logged. Ask the assistant to view or make changes.
-                      </p>
-                    </div>
-
-                    {/* July Fleet Stats Bento Grid */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#49454F]">July Statistics</h4>
-                        <span className="text-[9px] text-[#79747E] font-mono">July 1 - July 17</span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <div className="bg-[#F3EDF7] p-3 rounded-xl border border-[#CAC4D0]">
-                          <span className="text-[10px] text-[#49454F] block font-medium">Diesel Filled</span>
-                          <span className="text-sm font-bold text-[#1C1B1F] block mt-1">{stats.liters} Liters</span>
-                          <span className="text-[9px] text-[#79747E] font-mono block mt-0.5">July Cumulative</span>
-                        </div>
-
-                        <div className="bg-[#F3EDF7] p-3 rounded-xl border border-[#CAC4D0]">
-                          <span className="text-[10px] text-[#49454F] block font-medium">Fuel Cost</span>
-                          <span className="text-sm font-bold text-[#1B5E20] block mt-1">Rs. {stats.cost.toLocaleString('en-IN')}</span>
-                          <span className="text-[9px] text-[#79747E] block mt-0.5">Avg Rs. 90/Liter</span>
-                        </div>
-
-                        <div className="bg-[#F3EDF7] p-3 rounded-xl border border-[#CAC4D0]">
-                          <span className="text-[10px] text-[#49454F] block font-medium">Other Expenses</span>
-                          <span className="text-sm font-bold text-[#0D47A1] block mt-1">Rs. {JulyExpenses.toLocaleString('en-IN')}</span>
-                          <span className="text-[9px] text-[#79747E] block mt-0.5">Repairs & Tolls</span>
-                        </div>
-
-                        <div className="bg-[#F3EDF7] p-3 rounded-xl border border-[#CAC4D0]">
-                          <span className="text-[10px] text-[#49454F] block font-medium">Drivers Assigned</span>
-                          <span className="text-sm font-bold text-[#6750A4] block mt-1">{activeDriverCount()} / 4 Active</span>
-                          <span className="text-[9px] text-[#79747E] block mt-0.5">100% capacity</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Interactive Mobile Quick Actions */}
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#49454F]">Quick Operations</h4>
+                <AnimatePresence mode="wait">
+                  {/* TAB 1: HOME PANEL */}
+                  {activeTab === 'home' && (
+                    <motion.div
+                      key="home"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="space-y-4 flex-1"
+                    >
                       
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* File Upload Trigger */}
-                        <label className="flex flex-col items-center justify-center bg-[#EADDFF] hover:bg-[#D8C9EF] border border-[#CAC4D0] p-3.5 rounded-xl cursor-pointer text-center group transition-all duration-200">
-                          <Upload className="w-5 h-5 text-[#6750A4] mb-1 group-hover:scale-110 transition-transform" />
-                          <span className="text-xs font-semibold text-[#21005D]">Upload Receipt</span>
-                          <span className="text-[9px] text-[#49454F] mt-0.5">Parse bill automatically</span>
-                          <input 
-                            type="file" 
-                            accept="image/*,application/pdf" 
-                            onChange={handleDocumentUpload} 
-                            className="hidden" 
-                          />
-                        </label>
-
-                        {/* Voice Input Trigger */}
-                        <button 
-                          onClick={() => {
-                            setActiveTab('chat');
-                            setTimeout(() => {
-                              toggleListening();
-                            }, 300);
-                          }}
-                          className="flex flex-col items-center justify-center bg-[#E8DEF8] hover:bg-[#D8C9EF] border border-[#CAC4D0] p-3.5 rounded-xl text-center group transition-all duration-200"
-                        >
-                          <Mic className="w-5 h-5 text-[#6750A4] mb-1 group-hover:scale-110 transition-transform" />
-                          <span className="text-xs font-semibold text-[#1D192B]">Voice Assistant</span>
-                          <span className="text-[9px] text-[#49454F] mt-0.5">Hands-free speech</span>
-                        </button>
-
-                        {/* Reports Trigger */}
-                        <button 
-                          onClick={() => setActiveTab('reports')}
-                          className="col-span-2 flex items-center justify-start gap-3 bg-[#F3EDF7] hover:bg-[#EADDFF]/40 border border-[#CAC4D0] p-3 rounded-xl transition-all duration-200 group"
-                        >
-                          <div className="w-9 h-9 rounded-xl bg-[#6750A4]/10 flex items-center justify-center text-[#6750A4] group-hover:scale-105 transition-transform">
-                            <FileSpreadsheet className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <span className="text-xs font-bold text-[#1C1B1F] block">Generate Operational Reports</span>
-                            <span className="text-[9px] text-[#49454F] block mt-0.5">13 compliant ledgers with PDF/Excel exports</span>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-[#49454F] ml-auto shrink-0 group-hover:translate-x-0.5 transition-transform" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Recent Chats / Conversations */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#49454F]">Recent Chats</h4>
-                        <button onClick={() => setActiveTab('chat')} className="text-[#6750A4] hover:text-[#21005D] text-xs font-medium">Open Thread</button>
+                      {/* Welcome Hero Grid Banner */}
+                      <div className="bg-gradient-to-br from-[#EADDFF] to-[#D8C9EF] p-4 rounded-2xl border border-[#CAC4D0] shadow-sm">
+                        <div className="flex items-center gap-1.5 text-[#21005D] text-[10px] font-bold uppercase tracking-wider mb-2">
+                          <Sparkles className="w-3.5 h-3.5 text-[#6750A4]" />
+                          AI-Powered Mobile Fleet
+                        </div>
+                        <h3 className="text-lg font-bold text-[#21005D] leading-tight">Your fleet is running healthy</h3>
+                        <p className="text-[#49454F] text-xs mt-1.5 leading-snug">
+                          All 4 heavy trucks online. 1 schedule alarm logged. Ask the assistant to view or make changes.
+                        </p>
                       </div>
 
-                      <div className="space-y-1.5">
-                        {recentChats.map((chat, idx) => (
-                          <div 
-                            key={idx} 
+                      {/* July Fleet Stats Bento Grid */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#49454F]">July Statistics</h4>
+                          <span className="text-[9px] text-[#79747E] font-mono">July 1 - July 17</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="bg-[#F3EDF7] p-3 rounded-xl border border-[#CAC4D0]">
+                            <span className="text-[10px] text-[#49454F] block font-medium">Diesel Filled</span>
+                            <span className="text-sm font-bold text-[#1C1B1F] block mt-1">{stats.liters} Liters</span>
+                            <span className="text-[9px] text-[#79747E] font-mono block mt-0.5">July Cumulative</span>
+                          </div>
+
+                          <div className="bg-[#F3EDF7] p-3 rounded-xl border border-[#CAC4D0]">
+                            <span className="text-[10px] text-[#49454F] block font-medium">Fuel Cost</span>
+                            <span className="text-sm font-bold text-[#1B5E20] block mt-1">Rs. {stats.cost.toLocaleString('en-IN')}</span>
+                            <span className="text-[9px] text-[#79747E] block mt-0.5">Avg Rs. 90/Liter</span>
+                          </div>
+
+                          <div className="bg-[#F3EDF7] p-3 rounded-xl border border-[#CAC4D0]">
+                            <span className="text-[10px] text-[#49454F] block font-medium">Other Expenses</span>
+                            <span className="text-sm font-bold text-[#0D47A1] block mt-1">Rs. {JulyExpenses.toLocaleString('en-IN')}</span>
+                            <span className="text-[9px] text-[#79747E] block mt-0.5">Repairs & Tolls</span>
+                          </div>
+
+                          <div className="bg-[#F3EDF7] p-3 rounded-xl border border-[#CAC4D0]">
+                            <span className="text-[10px] text-[#49454F] block font-medium">Drivers Assigned</span>
+                            <span className="text-sm font-bold text-[#6750A4] block mt-1">{activeDriverCount()} / 4 Active</span>
+                            <span className="text-[9px] text-[#79747E] block mt-0.5">100% capacity</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Interactive Mobile Quick Actions */}
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#49454F]">Quick Operations</h4>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* File Upload Trigger */}
+                          <label className="flex flex-col items-center justify-center bg-[#EADDFF] hover:bg-[#D8C9EF] border border-[#CAC4D0] p-3.5 rounded-xl cursor-pointer text-center group transition-all duration-200">
+                            <Upload className="w-5 h-5 text-[#6750A4] mb-1 group-hover:scale-110 transition-transform" />
+                            <span className="text-xs font-semibold text-[#21005D]">Upload Receipt</span>
+                            <span className="text-[9px] text-[#49454F] mt-0.5">Parse bill automatically</span>
+                            <input 
+                              type="file" 
+                              accept="image/*,application/pdf" 
+                              onChange={handleDocumentUpload} 
+                              className="hidden" 
+                            />
+                          </label>
+
+                          {/* Voice Input Trigger */}
+                          <button 
                             onClick={() => {
                               setActiveTab('chat');
-                              handleSendMessage(chat);
+                              setTimeout(() => {
+                                toggleListening();
+                              }, 300);
                             }}
-                            className="bg-[#F3EDF7] hover:bg-[#E8DEF8] p-2.5 rounded-xl border border-[#CAC4D0] flex items-center justify-between cursor-pointer transition-colors"
+                            className="flex flex-col items-center justify-center bg-[#E8DEF8] hover:bg-[#D8C9EF] border border-[#CAC4D0] p-3.5 rounded-xl text-center group transition-all duration-200"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <MessageSquare className="w-4 h-4 text-[#49454F] shrink-0" />
-                              <span className="text-xs text-[#1C1B1F] truncate">{chat}</span>
+                            <Mic className="w-5 h-5 text-[#6750A4] mb-1 group-hover:scale-110 transition-transform" />
+                            <span className="text-xs font-semibold text-[#1D192B]">Voice Assistant</span>
+                            <span className="text-[9px] text-[#49454F] mt-0.5">Hands-free speech</span>
+                          </button>
+
+                          {/* Reports Trigger */}
+                          <button 
+                            onClick={() => setActiveTab('reports')}
+                            className="col-span-2 flex items-center justify-start gap-3 bg-[#F3EDF7] hover:bg-[#EADDFF]/40 border border-[#CAC4D0] p-3 rounded-xl transition-all duration-200 group"
+                          >
+                            <div className="w-9 h-9 rounded-xl bg-[#6750A4]/10 flex items-center justify-center text-[#6750A4] group-hover:scale-105 transition-transform">
+                              <FileSpreadsheet className="w-5 h-5" />
                             </div>
-                            <ChevronRight className="w-3.5 h-3.5 text-[#79747E] shrink-0" />
-                          </div>
-                        ))}
+                            <div className="text-left">
+                              <span className="text-xs font-bold text-[#1C1B1F] block">Generate Operational Reports</span>
+                              <span className="text-[9px] text-[#49454F] block mt-0.5">13 compliant ledgers with PDF/Excel exports</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-[#49454F] ml-auto shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                  </div>
-                )}
+                      {/* Recent Chats / Conversations */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#49454F]">Recent Chats</h4>
+                          <button onClick={() => setActiveTab('chat')} className="text-[#6750A4] hover:text-[#21005D] text-xs font-medium">Open Thread</button>
+                        </div>
 
-                {/* TAB 2: ACTIVE CHAT PANEL (The ChatGPT Experience) */}
-                {activeTab === 'chat' && (
-                  <div className="flex flex-col h-full flex-1 min-h-[380px] bg-[#F7F2FA]">
+                        <div className="space-y-1.5">
+                          {recentChats.map((chat, idx) => (
+                            <div 
+                              key={idx} 
+                              onClick={() => {
+                                setActiveTab('chat');
+                                handleSendMessage(chat);
+                              }}
+                              className="bg-[#F3EDF7] hover:bg-[#E8DEF8] p-2.5 rounded-xl border border-[#CAC4D0] flex items-center justify-between cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <MessageSquare className="w-4 h-4 text-[#49454F] shrink-0" />
+                                <span className="text-xs text-[#1C1B1F] truncate">{chat}</span>
+                              </div>
+                              <ChevronRight className="w-3.5 h-3.5 text-[#79747E] shrink-0" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                    </motion.div>
+                  )}
+
+                  {/* TAB 2: ACTIVE CHAT PANEL (The ChatGPT Experience) */}
+                  {activeTab === 'chat' && (
+                    <motion.div
+                      key="chat"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="flex flex-col h-full flex-1 min-h-[380px] bg-[#F7F2FA]"
+                    >
                     
                     {/* Chat History Thread */}
                     <div 
@@ -1230,12 +1560,19 @@ export default function App() {
                       )}
                     </div>
 
-                  </div>
-                )}
+                    </motion.div>
+                  )}
 
-                {/* TAB 3: VEHICLE MANAGEMENT & DETAILED PROFILE LEDGERS */}
-                {activeTab === 'fleet' && (
-                  <div className="space-y-4 animate-fade-in flex-1">
+                  {/* TAB 3: VEHICLE MANAGEMENT & DETAILED PROFILE LEDGERS */}
+                  {activeTab === 'fleet' && (
+                    <motion.div
+                      key="fleet"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="space-y-4 flex-1"
+                    >
                     
                     {selectedVehiclePlate ? (
                       /* --- 1. DETAILED VEHICLE PROFILE VIEW --- */
@@ -1798,12 +2135,19 @@ export default function App() {
                       </div>
                     )}
 
-                  </div>
-                )}
+                    </motion.div>
+                  )}
 
-                {/* TAB 4: DRIVER MANAGEMENT PANEL */}
-                {activeTab === 'drivers' && (
-                  <div className="space-y-4 animate-fade-in flex-1">
+                  {/* TAB 4: DRIVER MANAGEMENT PANEL */}
+                  {activeTab === 'drivers' && (
+                    <motion.div
+                      key="drivers"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="space-y-4 flex-1"
+                    >
                     {selectedDriverId ? (
                       /* --- 1. DETAILED DRIVER PROFILE VIEW --- */
                       (() => {
@@ -2562,12 +2906,19 @@ export default function App() {
                         </form>
                       </div>
                     )}
-                  </div>
-                )}
+                    </motion.div>
+                  )}
 
-                {/* TAB 5: CENTRALIZED CLOUD VAULT (DOCUMENT UPLOAD MODULE) */}
-                {activeTab === 'vault' && (
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {/* TAB 5: CENTRALIZED CLOUD VAULT (DOCUMENT UPLOAD MODULE) */}
+                  {activeTab === 'vault' && (
+                    <motion.div
+                      key="vault"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="flex-1 space-y-4"
+                    >
                     {/* Header Banner */}
                     <div className="bg-[#EADDFF] p-4 rounded-3xl border border-[#CAC4D0] relative overflow-hidden shadow-sm">
                       <div className="relative z-10">
@@ -2950,11 +3301,19 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
+                    </motion.div>
+                  )}
 
-                {activeTab === 'reminders' && (
-                  <div className="space-y-4 font-sans animate-in fade-in duration-200">
+                  {/* TAB 6: REMINDERS */}
+                  {activeTab === 'reminders' && (
+                    <motion.div
+                      key="reminders"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="space-y-4 font-sans flex-1"
+                    >
                     {/* Header card with summary */}
                     <div className="bg-gradient-to-br from-[#6750A4] to-[#4F378B] text-white p-4 rounded-3xl shadow-md space-y-3 relative overflow-hidden">
                       <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
@@ -3427,105 +3786,183 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
+                    </motion.div>
+                  )}
 
-                {activeTab === 'reports' && fleet && (
-                  <ReportsView fleet={fleet} triggerToast={triggerToast} />
-                )}
+                  {/* TAB 7: REPORTS */}
+                  {activeTab === 'reports' && fleet && (
+                    <motion.div
+                      key="reports"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="flex-1"
+                    >
+                      <ReportsView fleet={fleet} triggerToast={triggerToast} isDarkMode={isDarkMode} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
-              {/* Bottom Android Navigation Bar (Material 3 style) */}
-              <div className="bg-[#F3EDF7] border-t border-[#CAC4D0] px-1 py-2 flex justify-around items-center select-none shrink-0 z-30">
+              {/* Bottom Android Navigation Bar (Material 3 style with Framer Motion) */}
+              <div className={`border-t px-1 py-2 flex justify-around items-center select-none shrink-0 z-30 transition-colors ${
+                isDarkMode ? 'bg-[#211F26] border-[#36343B]' : 'bg-[#F3EDF7] border-[#CAC4D0]'
+              }`}>
                 <button 
                   onClick={() => setActiveTab('home')}
-                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold text-[#49454F] flex-1"
+                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold flex-1"
                 >
-                  <div className={`px-2.5 py-1 rounded-full transition-all ${
-                    activeTab === 'home' ? 'bg-[#EADDFF] text-[#21005D] scale-105' : 'hover:bg-[#E8DEF8]/50 text-[#49454F]'
-                  }`}>
-                    <Smartphone className="w-3.5 h-3.5" />
+                  <div className="relative px-2.5 py-1 rounded-full transition-colors flex items-center justify-center">
+                    {activeTab === 'home' && (
+                      <motion.div
+                        layoutId="activeTabPill"
+                        className={`absolute inset-0 rounded-full ${isDarkMode ? 'bg-[#4F378B]' : 'bg-[#EADDFF]'}`}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <Smartphone className={`w-3.5 h-3.5 relative z-10 ${
+                      activeTab === 'home' 
+                        ? isDarkMode ? 'text-[#EADDFF]' : 'text-[#21005D]' 
+                        : isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                    }`} />
                   </div>
-                  <span className={activeTab === 'home' ? 'font-bold text-[#1C1B1F]' : ''}>Home</span>
+                  <span className={activeTab === 'home' ? isDarkMode ? 'font-bold text-[#E6E0E9]' : 'font-bold text-[#1C1B1F]' : isDarkMode ? 'text-[#CAC4D0]' : ''}>Home</span>
                 </button>
 
                 <button 
                   onClick={() => setActiveTab('chat')}
-                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold text-[#49454F] flex-1"
+                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold flex-1"
                 >
-                  <div className={`px-2.5 py-1 rounded-full transition-all ${
-                    activeTab === 'chat' ? 'bg-[#EADDFF] text-[#21005D] scale-105' : 'hover:bg-[#E8DEF8]/50 text-[#49454F]'
-                  }`}>
-                    <MessageSquare className="w-3.5 h-3.5" />
+                  <div className="relative px-2.5 py-1 rounded-full transition-colors flex items-center justify-center">
+                    {activeTab === 'chat' && (
+                      <motion.div
+                        layoutId="activeTabPill"
+                        className={`absolute inset-0 rounded-full ${isDarkMode ? 'bg-[#4F378B]' : 'bg-[#EADDFF]'}`}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <MessageSquare className={`w-3.5 h-3.5 relative z-10 ${
+                      activeTab === 'chat' 
+                        ? isDarkMode ? 'text-[#EADDFF]' : 'text-[#21005D]' 
+                        : isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                    }`} />
                   </div>
-                  <span className={activeTab === 'chat' ? 'font-bold text-[#1C1B1F]' : ''}>Ask AI</span>
+                  <span className={activeTab === 'chat' ? isDarkMode ? 'font-bold text-[#E6E0E9]' : 'font-bold text-[#1C1B1F]' : isDarkMode ? 'text-[#CAC4D0]' : ''}>Ask AI</span>
                 </button>
 
                 <button 
                   onClick={() => setActiveTab('fleet')}
-                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold text-[#49454F] flex-1"
+                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold flex-1"
                 >
-                  <div className={`px-2.5 py-1 rounded-full transition-all ${
-                    activeTab === 'fleet' ? 'bg-[#EADDFF] text-[#21005D] scale-105' : 'hover:bg-[#E8DEF8]/50 text-[#49454F]'
-                  }`}>
-                    <Truck className="w-3.5 h-3.5" />
+                  <div className="relative px-2.5 py-1 rounded-full transition-colors flex items-center justify-center">
+                    {activeTab === 'fleet' && (
+                      <motion.div
+                        layoutId="activeTabPill"
+                        className={`absolute inset-0 rounded-full ${isDarkMode ? 'bg-[#4F378B]' : 'bg-[#EADDFF]'}`}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <Truck className={`w-3.5 h-3.5 relative z-10 ${
+                      activeTab === 'fleet' 
+                        ? isDarkMode ? 'text-[#EADDFF]' : 'text-[#21005D]' 
+                        : isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                    }`} />
                   </div>
-                  <span className={activeTab === 'fleet' ? 'font-bold text-[#1C1B1F]' : ''}>Fleet</span>
+                  <span className={activeTab === 'fleet' ? isDarkMode ? 'font-bold text-[#E6E0E9]' : 'font-bold text-[#1C1B1F]' : isDarkMode ? 'text-[#CAC4D0]' : ''}>Fleet</span>
                 </button>
 
                 <button 
                   onClick={() => setActiveTab('drivers')}
-                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold text-[#49454F] flex-1"
+                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold flex-1"
                 >
-                  <div className={`px-2.5 py-1 rounded-full transition-all ${
-                    activeTab === 'drivers' ? 'bg-[#EADDFF] text-[#21005D] scale-105' : 'hover:bg-[#E8DEF8]/50 text-[#49454F]'
-                  }`}>
-                    <User className="w-3.5 h-3.5" />
+                  <div className="relative px-2.5 py-1 rounded-full transition-colors flex items-center justify-center">
+                    {activeTab === 'drivers' && (
+                      <motion.div
+                        layoutId="activeTabPill"
+                        className={`absolute inset-0 rounded-full ${isDarkMode ? 'bg-[#4F378B]' : 'bg-[#EADDFF]'}`}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <User className={`w-3.5 h-3.5 relative z-10 ${
+                      activeTab === 'drivers' 
+                        ? isDarkMode ? 'text-[#EADDFF]' : 'text-[#21005D]' 
+                        : isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                    }`} />
                   </div>
-                  <span className={activeTab === 'drivers' ? 'font-bold text-[#1C1B1F]' : ''}>Drivers</span>
+                  <span className={activeTab === 'drivers' ? isDarkMode ? 'font-bold text-[#E6E0E9]' : 'font-bold text-[#1C1B1F]' : isDarkMode ? 'text-[#CAC4D0]' : ''}>Drivers</span>
                 </button>
 
                 <button 
                   onClick={() => setActiveTab('reminders')}
-                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold text-[#49454F] flex-1"
+                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold flex-1"
                 >
-                  <div className={`px-2.5 py-1 rounded-full transition-all ${
-                    activeTab === 'reminders' ? 'bg-[#EADDFF] text-[#21005D] scale-105' : 'hover:bg-[#E8DEF8]/50 text-[#49454F]'
-                  }`}>
-                    <Clock className="w-3.5 h-3.5" />
+                  <div className="relative px-2.5 py-1 rounded-full transition-colors flex items-center justify-center">
+                    {activeTab === 'reminders' && (
+                      <motion.div
+                        layoutId="activeTabPill"
+                        className={`absolute inset-0 rounded-full ${isDarkMode ? 'bg-[#4F378B]' : 'bg-[#EADDFF]'}`}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <Clock className={`w-3.5 h-3.5 relative z-10 ${
+                      activeTab === 'reminders' 
+                        ? isDarkMode ? 'text-[#EADDFF]' : 'text-[#21005D]' 
+                        : isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                    }`} />
                   </div>
-                  <span className={activeTab === 'reminders' ? 'font-bold text-[#1C1B1F]' : ''}>Reminders</span>
+                  <span className={activeTab === 'reminders' ? isDarkMode ? 'font-bold text-[#E6E0E9]' : 'font-bold text-[#1C1B1F]' : isDarkMode ? 'text-[#CAC4D0]' : ''}>Reminders</span>
                 </button>
 
                 <button 
                   onClick={() => setActiveTab('vault')}
-                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold text-[#49454F] flex-1"
+                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold flex-1"
                 >
-                  <div className={`px-2.5 py-1 rounded-full transition-all ${
-                    activeTab === 'vault' ? 'bg-[#EADDFF] text-[#21005D] scale-105' : 'hover:bg-[#E8DEF8]/50 text-[#49454F]'
-                  }`}>
-                    <Folder className="w-3.5 h-3.5" />
+                  <div className="relative px-2.5 py-1 rounded-full transition-colors flex items-center justify-center">
+                    {activeTab === 'vault' && (
+                      <motion.div
+                        layoutId="activeTabPill"
+                        className={`absolute inset-0 rounded-full ${isDarkMode ? 'bg-[#4F378B]' : 'bg-[#EADDFF]'}`}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <Folder className={`w-3.5 h-3.5 relative z-10 ${
+                      activeTab === 'vault' 
+                        ? isDarkMode ? 'text-[#EADDFF]' : 'text-[#21005D]' 
+                        : isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                    }`} />
                   </div>
-                  <span className={activeTab === 'vault' ? 'font-bold text-[#1C1B1F]' : ''}>Vault</span>
+                  <span className={activeTab === 'vault' ? isDarkMode ? 'font-bold text-[#E6E0E9]' : 'font-bold text-[#1C1B1F]' : isDarkMode ? 'text-[#CAC4D0]' : ''}>Vault</span>
                 </button>
 
                 <button 
                   onClick={() => setActiveTab('reports')}
-                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold text-[#49454F] flex-1"
+                  className="flex flex-col items-center gap-1 text-[8.5px] font-semibold flex-1"
                 >
-                  <div className={`px-2.5 py-1 rounded-full transition-all ${
-                    activeTab === 'reports' ? 'bg-[#EADDFF] text-[#21005D] scale-105' : 'hover:bg-[#E8DEF8]/50 text-[#49454F]'
-                  }`}>
-                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <div className="relative px-2.5 py-1 rounded-full transition-colors flex items-center justify-center">
+                    {activeTab === 'reports' && (
+                      <motion.div
+                        layoutId="activeTabPill"
+                        className={`absolute inset-0 rounded-full ${isDarkMode ? 'bg-[#4F378B]' : 'bg-[#EADDFF]'}`}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <FileSpreadsheet className={`w-3.5 h-3.5 relative z-10 ${
+                      activeTab === 'reports' 
+                        ? isDarkMode ? 'text-[#EADDFF]' : 'text-[#21005D]' 
+                        : isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                    }`} />
                   </div>
-                  <span className={activeTab === 'reports' ? 'font-bold text-[#1C1B1F]' : ''}>Reports</span>
+                  <span className={activeTab === 'reports' ? isDarkMode ? 'font-bold text-[#E6E0E9]' : 'font-bold text-[#1C1B1F]' : isDarkMode ? 'text-[#CAC4D0]' : ''}>Reports</span>
                 </button>
               </div>
 
             </div>
 
             {/* Simulated Android Navigation pill bar */}
-            <div className="w-full flex justify-center py-2 bg-[#F3EDF7] select-none z-40">
+            <div className={`w-full flex justify-center py-2 select-none z-40 transition-colors ${
+              isDarkMode ? 'bg-[#211F26]' : 'bg-[#F3EDF7]'
+            }`}>
               <div className="w-24 h-1 bg-[#79747E] rounded-full"></div>
             </div>
 
@@ -3535,7 +3972,9 @@ export default function App() {
       </div>
 
       {/* RIGHT PANEL: Flutter Production Code Explorer & Exporter */}
-      <div className={`bg-[#F3EDF7] p-4 md:p-6 lg:p-8 flex flex-col transition-all duration-300 ${
+      <div className={`p-4 md:p-6 lg:p-8 flex flex-col transition-all duration-300 ${
+        isDarkMode ? 'bg-[#1D1B20] border-[#36343B] text-[#E6E0E9]' : 'bg-[#F3EDF7] border-[#CAC4D0] text-[#1C1B1F]'
+      } ${
         isFlutterSidebarOpen ? 'w-full md:w-[45%] lg:w-[42%]' : 'w-full md:w-16'
       } overflow-y-auto shrink-0 border-t md:border-t-0 md:border-l border-[#CAC4D0]`}>
         
@@ -3924,6 +4363,160 @@ export default function App() {
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Confirm & Save to Database
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SERVICE WORKER OFFLINE SYNC QUEUE MODAL */}
+      {showSyncModal && (
+        <div className="fixed inset-0 bg-[#1C1B1F]/60 backdrop-blur-sm z-50 flex flex-col justify-center items-center p-4">
+          <div className={`p-6 rounded-3xl border text-left max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto transition-colors ${
+            isDarkMode 
+              ? 'bg-[#211F26] border-[#49454F] text-[#E6E0E9]' 
+              : 'bg-white border-[#CAC4D0] text-[#1C1B1F]'
+          }`}>
+            <div className="flex items-center justify-between border-b pb-3 border-[#CAC4D0]/30">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold ${
+                  isDarkMode ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">Service Worker Offline Sync Queue</h3>
+                  <p className={`text-[11px] font-medium ${isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'}`}>
+                    IndexedDB Persistent Storage & Auto-Sync Engine
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowSyncModal(false)}
+                className={`p-1.5 rounded-full transition-colors ${
+                  isDarkMode ? 'hover:bg-[#36343B] text-[#E6E0E9]' : 'hover:bg-[#E8DEF8] text-[#1C1B1F]'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Offline Simulator Controls */}
+            <div className={`p-3 rounded-2xl border flex items-center justify-between ${
+              isDarkMode ? 'bg-[#2B2930] border-[#49454F]' : 'bg-[#F3EDF7] border-[#CAC4D0]'
+            }`}>
+              <div className="flex items-center gap-2">
+                {isOffline ? <WifiOff className="w-4 h-4 text-amber-400" /> : <Wifi className="w-4 h-4 text-emerald-500" />}
+                <div>
+                  <div className="text-xs font-bold">
+                    Network Status: {isOffline ? "⚡ OFFLINE" : "🌐 ONLINE"}
+                  </div>
+                  <div className="text-[10px] opacity-70">
+                    {isSimulatedOffline ? "Simulated Offline Mode Enabled" : "Connected to Backend API"}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleToggleSimulatedOffline(!isSimulatedOffline)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
+                  isSimulatedOffline 
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                    : 'bg-amber-600 hover:bg-amber-700 text-white'
+                }`}
+              >
+                {isSimulatedOffline ? "Restore Online" : "Simulate Offline"}
+              </button>
+            </div>
+
+            {/* Sync Progress Indicator */}
+            {isSyncingQueue && (
+              <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-xs flex items-center gap-2 text-indigo-400 font-medium animate-pulse">
+                <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+                <span>{syncProgressMsg || "Synchronizing with PostgreSQL database..."}</span>
+              </div>
+            )}
+
+            {/* Pending List */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold px-1">
+                <span>Cached Pending Submissions ({pendingSyncItems.length})</span>
+                {pendingSyncItems.length > 0 && (
+                  <button 
+                    onClick={handleClearQueue}
+                    className="text-red-400 hover:text-red-300 text-[11px] font-semibold flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" /> Clear Queue
+                  </button>
+                )}
+              </div>
+
+              {pendingSyncItems.length === 0 ? (
+                <div className={`p-6 text-center rounded-2xl border border-dashed text-xs ${
+                  isDarkMode ? 'border-[#49454F] text-[#CAC4D0]' : 'border-[#CAC4D0] text-[#49454F]'
+                }`}>
+                  <Check className="w-8 h-8 mx-auto mb-1.5 text-emerald-500" />
+                  <p className="font-bold text-sm">All Items Synchronized</p>
+                  <p className="text-[11px] mt-0.5">Document uploads and expense log submissions will automatically queue here when mobile device is offline.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {pendingSyncItems.map(item => (
+                    <div 
+                      key={item.id}
+                      className={`p-3 rounded-2xl border text-xs flex items-center justify-between transition-colors ${
+                        isDarkMode ? 'bg-[#2B2930] border-[#49454F]' : 'bg-[#F7F2FA] border-[#CAC4D0]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
+                          item.type === 'DOCUMENT_UPLOAD' 
+                            ? 'bg-blue-500/20 text-blue-400' 
+                            : 'bg-emerald-500/20 text-emerald-400'
+                        }`}>
+                          {item.type === 'DOCUMENT_UPLOAD' ? <CloudUpload className="w-4 h-4" /> : <Wallet className="w-4 h-4" />}
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs leading-tight">{item.title}</div>
+                          <div className="text-[10px] opacity-70 flex items-center gap-1 mt-0.5 font-mono">
+                            <Clock className="w-3 h-3" />
+                            {new Date(item.createdAt).toLocaleTimeString()} · {item.type}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Queued
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="pt-2 border-t border-[#CAC4D0]/30 flex items-center justify-end gap-2">
+              <button 
+                onClick={() => setShowSyncModal(false)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold ${
+                  isDarkMode ? 'hover:bg-[#36343B] text-[#CAC4D0]' : 'hover:bg-[#E8DEF8] text-[#49454F]'
+                }`}
+              >
+                Close
+              </button>
+              
+              <button 
+                disabled={isSyncingQueue || pendingSyncItems.length === 0}
+                onClick={handleManualSync}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 shadow-sm transition-all ${
+                  isSyncingQueue || pendingSyncItems.length === 0
+                    ? 'bg-gray-500 opacity-50 cursor-not-allowed'
+                    : isDarkMode ? 'bg-[#D0BCFF] text-[#381E72] hover:bg-[#E8DEF8]' : 'bg-[#6750A4] hover:bg-[#523E87]'
+                }`}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingQueue ? 'animate-spin' : ''}`} />
+                <span>Sync Now</span>
               </button>
             </div>
           </div>

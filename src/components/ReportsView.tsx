@@ -18,13 +18,17 @@ import {
   CheckCircle,
   AlertTriangle,
   MapPin,
-  ClipboardList
+  ClipboardList,
+  BarChart2,
+  Zap,
+  Droplet
 } from "lucide-react";
 import { FleetDatabase, Vehicle, Driver, FuelLog, ExpenseLog } from "../types";
 
 interface ReportsViewProps {
   fleet: FleetDatabase | null;
   triggerToast: (msg: string) => void;
+  isDarkMode?: boolean;
 }
 
 type ReportType = 
@@ -42,7 +46,7 @@ type ReportType =
   | 'monthly'
   | 'yearly';
 
-export default function ReportsView({ fleet, triggerToast }: ReportsViewProps) {
+export default function ReportsView({ fleet, triggerToast, isDarkMode = false }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
   
   // Filter States
@@ -894,32 +898,46 @@ export default function ReportsView({ fleet, triggerToast }: ReportsViewProps) {
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#FAF9FC] overflow-hidden animate-in fade-in duration-200 font-sans">
+    <div className={`flex-1 flex flex-col h-full overflow-hidden animate-in fade-in duration-200 font-sans transition-colors ${
+      isDarkMode ? 'bg-[#141218] text-[#E6E0E9]' : 'bg-[#FAF9FC] text-[#1C1B1F]'
+    }`}>
       
       {/* Dynamic Header */}
-      <div className="bg-white border-b border-[#CAC4D0] px-4 py-3 flex items-center gap-3 shrink-0">
-        {selectedReport ? (
-          <button 
-            onClick={() => setSelectedReport(null)}
-            className="text-[#49454F] hover:bg-[#E8DEF8]/60 p-2 rounded-full transition-colors active:scale-95"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-        ) : null}
-        <div>
-          <h1 className="text-base font-extrabold text-[#1C1B1F]">
-            {selectedReport 
-              ? reportsList.find(r => r.id === selectedReport)?.title + " Report"
-              : "Compliance Reports Panel"
-            }
-          </h1>
-          <p className="text-[10px] text-[#49454F] font-medium">
-            {selectedReport 
-              ? "Official ledger analysis & dynamic records" 
-              : "Audit-ready live exportable fleet reports"
-            }
-          </p>
+      <div className={`px-4 py-3 flex items-center justify-between border-b shrink-0 transition-colors ${
+        isDarkMode ? 'bg-[#211F26] border-[#36343B]' : 'bg-white border-[#CAC4D0]'
+      }`}>
+        <div className="flex items-center gap-3">
+          {selectedReport ? (
+            <button 
+              onClick={() => setSelectedReport(null)}
+              className={`p-2 rounded-full transition-colors active:scale-95 ${
+                isDarkMode ? 'text-[#CAC4D0] hover:bg-[#36343B]' : 'text-[#49454F] hover:bg-[#E8DEF8]/60'
+              }`}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          ) : null}
+          <div>
+            <h1 className={`text-base font-extrabold ${isDarkMode ? 'text-[#E6E0E9]' : 'text-[#1C1B1F]'}`}>
+              {selectedReport 
+                ? reportsList.find(r => r.id === selectedReport)?.title + " Report"
+                : "Compliance Reports Panel"
+              }
+            </h1>
+            <p className={`text-[10px] font-medium ${isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'}`}>
+              {selectedReport 
+                ? "Official ledger analysis & dynamic records" 
+                : "Audit-ready live exportable fleet reports"
+              }
+            </p>
+          </div>
         </div>
+
+        {isDarkMode && (
+          <span className="bg-[#381E72] text-[#D0BCFF] text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border border-[#4F378B]">
+            NIGHT MODE (HIGH CONTRAST)
+          </span>
+        )}
       </div>
 
       {/* Main Container */}
@@ -928,41 +946,61 @@ export default function ReportsView({ fleet, triggerToast }: ReportsViewProps) {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           
           {/* Calendar & Global Filter Card */}
-          <div className="bg-[#EADDFF]/40 border border-[#EADDFF] p-4 rounded-3xl space-y-3 shadow-xs">
-            <h3 className="text-xs font-extrabold text-[#21005D] flex items-center gap-1.5 uppercase tracking-wider">
+          <div className={`p-4 rounded-3xl space-y-3 shadow-xs border transition-colors ${
+            isDarkMode 
+              ? 'bg-[#2B2930] border-[#49454F] text-[#E6E0E9]' 
+              : 'bg-[#EADDFF]/40 border-[#EADDFF] text-[#1C1B1F]'
+          }`}>
+            <h3 className={`text-xs font-extrabold flex items-center gap-1.5 uppercase tracking-wider ${
+              isDarkMode ? 'text-[#D0BCFF]' : 'text-[#21005D]'
+            }`}>
               <Filter className="w-3.5 h-3.5" />
               Global Ledger Filter
             </h3>
             
             <div className="grid grid-cols-2 gap-3 text-[11px]">
               <div>
-                <label className="block text-[9px] font-bold text-[#49454F] uppercase tracking-wider mb-1">From Date</label>
-                <div className="bg-white border border-[#CAC4D0] rounded-xl px-2.5 py-1.5 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-[#6750A4]" />
+                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 ${
+                  isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                }`}>From Date</label>
+                <div className={`border rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 ${
+                  isDarkMode ? 'bg-[#211F26] border-[#49454F]' : 'bg-white border-[#CAC4D0]'
+                }`}>
+                  <Calendar className={`w-3.5 h-3.5 ${isDarkMode ? 'text-[#D0BCFF]' : 'text-[#6750A4]'}`} />
                   <input 
                     type="date" 
                     value={dateFrom} 
                     onChange={(e) => setDateFrom(e.target.value)} 
-                    className="bg-transparent border-none text-[#1C1B1F] focus:outline-none w-full font-medium"
+                    className={`bg-transparent border-none focus:outline-none w-full font-medium ${
+                      isDarkMode ? 'text-[#E6E0E9]' : 'text-[#1C1B1F]'
+                    }`}
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-[9px] font-bold text-[#49454F] uppercase tracking-wider mb-1">To Date</label>
-                <div className="bg-white border border-[#CAC4D0] rounded-xl px-2.5 py-1.5 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-[#6750A4]" />
+                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 ${
+                  isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                }`}>To Date</label>
+                <div className={`border rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 ${
+                  isDarkMode ? 'bg-[#211F26] border-[#49454F]' : 'bg-white border-[#CAC4D0]'
+                }`}>
+                  <Calendar className={`w-3.5 h-3.5 ${isDarkMode ? 'text-[#D0BCFF]' : 'text-[#6750A4]'}`} />
                   <input 
                     type="date" 
                     value={dateTo} 
                     onChange={(e) => setDateTo(e.target.value)} 
-                    className="bg-transparent border-none text-[#1C1B1F] focus:outline-none w-full font-medium"
+                    className={`bg-transparent border-none focus:outline-none w-full font-medium ${
+                      isDarkMode ? 'text-[#E6E0E9]' : 'text-[#1C1B1F]'
+                    }`}
                   />
                 </div>
               </div>
             </div>
 
-            <p className="text-[9px] text-[#21005D]/70 font-semibold italic text-center pt-1 border-t border-[#EADDFF]/60">
+            <p className={`text-[9px] font-semibold italic text-center pt-1 border-t ${
+              isDarkMode ? 'text-[#D0BCFF]/80 border-[#49454F]' : 'text-[#21005D]/70 border-[#EADDFF]/60'
+            }`}>
               * Filters apply instantly across all 13 customized ledger cards below.
             </p>
           </div>
@@ -975,26 +1013,40 @@ export default function ReportsView({ fleet, triggerToast }: ReportsViewProps) {
                 <button
                   key={report.id}
                   onClick={() => setSelectedReport(report.id as ReportType)}
-                  className="bg-white p-3.5 rounded-2xl border border-[#CAC4D0]/60 hover:border-[#6750A4] text-left transition-all hover:bg-[#F3EDF7]/20 flex items-start justify-between gap-3 shadow-xs active:scale-98 group"
+                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-start justify-between gap-3 shadow-xs active:scale-98 group ${
+                    isDarkMode 
+                      ? 'bg-[#211F26] border-[#36343B] hover:border-[#D0BCFF] hover:bg-[#2B2930]' 
+                      : 'bg-white border-[#CAC4D0]/60 hover:border-[#6750A4] hover:bg-[#F3EDF7]/20'
+                  }`}
                 >
                   <div className="space-y-1">
-                    <span className="text-[8px] font-extrabold uppercase bg-[#F3EDF7] text-[#21005D] border border-[#CAC4D0]/40 px-2 py-0.5 rounded-full">
+                    <span className={`text-[8px] font-extrabold uppercase border px-2 py-0.5 rounded-full ${
+                      isDarkMode ? 'bg-[#2B2930] text-[#D0BCFF] border-[#49454F]' : 'bg-[#F3EDF7] text-[#21005D] border-[#CAC4D0]/40'
+                    }`}>
                       {report.category}
                     </span>
-                    <h3 className="font-bold text-xs sm:text-sm text-[#1C1B1F] mt-1 group-hover:text-[#6750A4] transition-colors">
+                    <h3 className={`font-bold text-xs sm:text-sm mt-1 transition-colors ${
+                      isDarkMode ? 'text-[#E6E0E9] group-hover:text-[#D0BCFF]' : 'text-[#1C1B1F] group-hover:text-[#6750A4]'
+                    }`}>
                       {report.title}
                     </h3>
-                    <p className="text-[10px] text-[#49454F] font-medium leading-relaxed">
+                    <p className={`text-[10px] font-medium leading-relaxed ${
+                      isDarkMode ? 'text-[#CAC4D0]' : 'text-[#49454F]'
+                    }`}>
                       {report.desc}
                     </p>
                   </div>
 
                   <div className="flex flex-col items-end justify-between h-full shrink-0">
-                    <div className="bg-[#EADDFF] text-[#21005D] p-2 rounded-xl group-hover:bg-[#6750A4] group-hover:text-white transition-colors">
+                    <div className={`p-2 rounded-xl transition-colors ${
+                      isDarkMode ? 'bg-[#4F378B] text-[#EADDFF]' : 'bg-[#EADDFF] text-[#21005D] group-hover:bg-[#6750A4] group-hover:text-white'
+                    }`}>
                       <IconComp className="w-4 h-4" />
                     </div>
                     {report.id !== 'insurance' && (
-                      <span className="text-[9px] font-black text-[#6750A4] bg-[#F3EDF7] px-2 py-0.5 rounded-md border border-[#CAC4D0]/30 mt-2">
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border mt-2 ${
+                        isDarkMode ? 'text-[#D0BCFF] bg-[#2B2930] border-[#49454F]' : 'text-[#6750A4] bg-[#F3EDF7] border-[#CAC4D0]/30'
+                      }`}>
                         {report.count} items
                       </span>
                     )}
@@ -1171,6 +1223,7 @@ export default function ReportsView({ fleet, triggerToast }: ReportsViewProps) {
               {/* FUEL REPORT */}
               {selectedReport === 'fuel' && (
                 <div className="min-w-[400px]">
+
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-[#F3EDF7] text-[#21005D]">
@@ -1279,6 +1332,7 @@ export default function ReportsView({ fleet, triggerToast }: ReportsViewProps) {
               {/* MILEAGE ENGINE */}
               {selectedReport === 'mileage' && (
                 <div className="min-w-[400px]">
+
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-[#F3EDF7] text-[#21005D]">
