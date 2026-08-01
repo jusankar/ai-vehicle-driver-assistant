@@ -17,7 +17,7 @@ import { eq, sql } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
+  apiKey: process.env.GEMINI_API_KEY || "DUMMY_KEY",
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
@@ -497,7 +497,7 @@ export async function seedDatabase() {
       console.log("Knowledge Base embeddings already seeded.");
     }
 
-  } catch (error) {
-    console.error("Error seeding database:", error);
+  } catch (error: any) {
+    console.warn("Database seeding skipped or failed (PostgreSQL connection status):", error?.message || error);
   }
 }
