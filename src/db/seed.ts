@@ -1,3 +1,9 @@
+import * as dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config();
+
 import { db } from "./index.ts";
 import { 
   drivers, 
@@ -498,7 +504,12 @@ export async function seedDatabase() {
     }
 
   } catch (error: any) {
-    console.warn("Database seeding skipped or failed (PostgreSQL connection status):", error?.message || error);
+    console.error("Database seeding failed:", error?.message || error);
+    if (error?.message?.includes("does not exist") || error?.code === "42P01") {
+      console.log("\n-> TIP: The tables do not exist in your database yet! Run `npm run db:push` first to create the tables, then run `npm run db:seed` again.");
+    } else if (error?.code === "28P01" || error?.message?.includes("password authentication failed")) {
+      console.log("\n-> TIP: Password authentication failed! Check your .env file credentials (SQL_PASSWORD / SQL_USER).");
+    }
   }
 }
 
