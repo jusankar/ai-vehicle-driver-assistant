@@ -532,6 +532,43 @@ class FleetViewModel extends ChangeNotifier {
     }
   }
 
+  void addAttendance({required String driverId, required String status, String? startDuty, String? endDuty}) {
+    final idx = _drivers.indexWhere((d) => d.id == driverId);
+    if (idx != -1) {
+      final driver = _drivers[idx];
+      driver.attendanceStatus = status;
+      final today = DateTime.now();
+      driver.attendanceHistory.insert(0, AttendanceRecord(
+        date: today,
+        status: status,
+        startDuty: startDuty,
+        endDuty: endDuty,
+      ));
+      notifyListeners();
+    }
+  }
+
+  void addAdvance({required String driverId, required double amount, required String description, required String type}) {
+    final idx = _drivers.indexWhere((d) => d.id == driverId);
+    if (idx != -1) {
+      final driver = _drivers[idx];
+      if (type == 'advance') {
+        driver.advance += amount;
+      } else {
+        driver.advance -= amount;
+        if (driver.advance < 0) driver.advance = 0;
+      }
+      driver.advanceHistory.insert(0, AdvanceRecord(
+        id: 'adv_${DateTime.now().millisecondsSinceEpoch}',
+        date: DateTime.now(),
+        amount: amount,
+        description: description,
+        type: type,
+      ));
+      notifyListeners();
+    }
+  }
+
   void addDriverDoc(String driverId, DriverDocument doc) {
     final idx = _drivers.indexWhere((d) => d.id == driverId);
     if (idx != -1) {

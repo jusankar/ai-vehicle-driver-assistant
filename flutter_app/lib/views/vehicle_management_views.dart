@@ -89,7 +89,7 @@ class _VehicleListViewState extends State<VehicleListView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.directions_truck_outlined, size: 64, color: theme.colorScheme.outlineVariant),
+                        Icon(Icons.local_shipping_outlined, size: 64, color: theme.colorScheme.outlineVariant),
                         const SizedBox(height: 16),
                         Text('No trucks found matching filters', style: theme.textTheme.bodyLarge),
                       ],
@@ -146,7 +146,7 @@ class _VehicleListViewState extends State<VehicleListView> {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, py: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(4),
@@ -386,8 +386,8 @@ class VehicleDetailView extends StatelessWidget {
 
               if (no != null && expiry != null) {
                 daysLeft = expiry.difference(today).inDays;
-                subtitle = 'No: $no
-Expires: ${expiry.toIso8601String().split('T')[0]}';
+                subtitle = "No: $no
+Expires: ${expiry.toIso8601String().split('T')[0]}";
                 if (daysLeft <= 0) {
                   subtitle += ' (EXPIRED)';
                   statusColor = Colors.red;

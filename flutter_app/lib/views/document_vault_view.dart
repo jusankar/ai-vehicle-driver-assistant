@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../models/cloud_document.dart';
+import '../models/fleet_model.dart';
 import '../viewmodels/fleet_viewmodel.dart';
 
 class DocumentVaultView extends StatefulWidget {
@@ -101,16 +103,16 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.emerald.withOpacity(0.15),
+              color: const Color(0xFF10B981).withOpacity(0.15),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.emerald.withOpacity(0.3)),
+              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.lock_outline, size: 12, color: Colors.emerald),
+                Icon(Icons.lock_outline, size: 12, color: Color(0xFF10B981)),
                 SizedBox(width: 4),
-                Text('AES-256', style: TextStyle(color: Colors.emerald, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text('AES-256', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
               ],
             ),
           )
@@ -384,7 +386,7 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
                                 Row(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, py: 1),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                       decoration: BoxDecoration(
                                         color: theme.colorScheme.primaryContainer,
                                         borderRadius: BorderRadius.circular(6),
@@ -461,7 +463,7 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
       ),
     );
   }
-};
+}
 
 class AttendanceAdvancesView extends StatefulWidget {
   final String driverId;

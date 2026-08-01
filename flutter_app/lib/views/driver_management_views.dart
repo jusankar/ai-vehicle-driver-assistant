@@ -251,7 +251,7 @@ class _DriverListViewState extends State<DriverListView> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, py: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: statusColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
@@ -351,7 +351,7 @@ class DriverDetailView extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, py: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: (driver.dutyStatus == 'OnDuty' ? Colors.green : Colors.grey).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),

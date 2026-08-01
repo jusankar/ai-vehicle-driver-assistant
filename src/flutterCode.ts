@@ -969,6 +969,43 @@ class FleetViewModel extends ChangeNotifier {
     }
   }
 
+  void addAttendance({required String driverId, required String status, String? startDuty, String? endDuty}) {
+    final idx = _drivers.indexWhere((d) => d.id == driverId);
+    if (idx != -1) {
+      final driver = _drivers[idx];
+      driver.attendanceStatus = status;
+      final today = DateTime.now();
+      driver.attendanceHistory.insert(0, AttendanceRecord(
+        date: today,
+        status: status,
+        startDuty: startDuty,
+        endDuty: endDuty,
+      ));
+      notifyListeners();
+    }
+  }
+
+  void addAdvance({required String driverId, required double amount, required String description, required String type}) {
+    final idx = _drivers.indexWhere((d) => d.id == driverId);
+    if (idx != -1) {
+      final driver = _drivers[idx];
+      if (type == 'advance') {
+        driver.advance += amount;
+      } else {
+        driver.advance -= amount;
+        if (driver.advance < 0) driver.advance = 0;
+      }
+      driver.advanceHistory.insert(0, AdvanceRecord(
+        id: 'adv_\${DateTime.now().millisecondsSinceEpoch}',
+        date: DateTime.now(),
+        amount: amount,
+        description: description,
+        type: type,
+      ));
+      notifyListeners();
+    }
+  }
+
   void addDriverDoc(String driverId, DriverDocument doc) {
     final idx = _drivers.indexWhere((d) => d.id == driverId);
     if (idx != -1) {
@@ -1976,7 +2013,7 @@ class _VehicleListViewState extends State<VehicleListView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.directions_truck_outlined, size: 64, color: theme.colorScheme.outlineVariant),
+                        Icon(Icons.local_shipping_outlined, size: 64, color: theme.colorScheme.outlineVariant),
                         const SizedBox(height: 16),
                         Text('No trucks found matching filters', style: theme.textTheme.bodyLarge),
                       ],
@@ -2033,7 +2070,7 @@ class _VehicleListViewState extends State<VehicleListView> {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, py: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(4),
@@ -2273,7 +2310,7 @@ class VehicleDetailView extends StatelessWidget {
 
               if (no != null && expiry != null) {
                 daysLeft = expiry.difference(today).inDays;
-                subtitle = 'No: \$no\nExpires: \${expiry.toIso8601String().split('T')[0]}';
+                subtitle = "No: \$no\nExpires: \${expiry.toIso8601String().split('T')[0]}";
                 if (daysLeft <= 0) {
                   subtitle += ' (EXPIRED)';
                   statusColor = Colors.red;
@@ -2887,7 +2924,7 @@ class _DriverListViewState extends State<DriverListView> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, py: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: statusColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
@@ -2987,7 +3024,7 @@ class DriverDetailView extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, py: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: (driver.dutyStatus == 'OnDuty' ? Colors.green : Colors.grey).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),
@@ -3900,7 +3937,9 @@ class MyApp extends StatelessWidget {
     language: "dart",
     content: `import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../models/cloud_document.dart';
+import '../models/fleet_model.dart';
 import '../viewmodels/fleet_viewmodel.dart';
 
 class DocumentVaultView extends StatefulWidget {
@@ -4001,16 +4040,16 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.emerald.withOpacity(0.15),
+              color: const Color(0xFF10B981).withOpacity(0.15),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.emerald.withOpacity(0.3)),
+              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.lock_outline, size: 12, color: Colors.emerald),
+                Icon(Icons.lock_outline, size: 12, color: Color(0xFF10B981)),
                 SizedBox(width: 4),
-                Text('AES-256', style: TextStyle(color: Colors.emerald, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text('AES-256', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
               ],
             ),
           )
@@ -4284,7 +4323,7 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
                                 Row(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, py: 1),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                       decoration: BoxDecoration(
                                         color: theme.colorScheme.primaryContainer,
                                         borderRadius: BorderRadius.circular(6),
@@ -4361,7 +4400,7 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
       ),
     );
   }
-};
+}
 
 class AttendanceAdvancesView extends StatefulWidget {
   final String driverId;
