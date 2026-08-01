@@ -501,3 +501,13 @@ export async function seedDatabase() {
     console.warn("Database seeding skipped or failed (PostgreSQL connection status):", error?.message || error);
   }
 }
+
+if (process.argv[1]?.includes('seed')) {
+  seedDatabase().then(() => {
+    console.log("Seeding process completed.");
+    process.exit(0);
+  }).catch((err) => {
+    console.error("Seeding error:", err);
+    process.exit(1);
+  });
+}
