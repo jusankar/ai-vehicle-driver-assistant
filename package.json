@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "db:push": "tsx src/db/push.ts",
     "db:push:drizzle": "drizzle-kit push --config=src/db/drizzle.config.ts --force",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "export:flutter": "tsx export_flutter.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
