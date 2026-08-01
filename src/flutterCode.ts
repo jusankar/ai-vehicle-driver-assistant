@@ -4920,6 +4920,27 @@ flutter {
 `
   },
   {
+    path: "android/app/src/main/res/values/styles.xml",
+    language: "xml",
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">?android:attr/colorBackground</item>
+    </style>
+</resources>`
+  },
+  {
+    path: "android/app/src/main/res/drawable/launch_background.xml",
+    language: "xml",
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="?android:attr/colorBackground" />
+</layer-list>`
+  },
+  {
     path: "android/app/src/main/AndroidManifest.xml",
     language: "xml",
     content: `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -4930,7 +4951,7 @@ flutter {
     <application
         android:label="Fleet AI Assistant"
         android:name="\${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@android:drawable/sym_def_app_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"
