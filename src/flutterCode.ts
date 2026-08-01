@@ -4791,7 +4791,7 @@ class _AttendanceAdvancesViewState extends State<AttendanceAdvancesView> {
 distributionPath=wrapper/dists
 zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
-distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.10.2-all.zip
 `
   },
   {
@@ -4820,8 +4820,8 @@ distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "8.3.0" apply false
-    id "org.jetbrains.kotlin.android" version "1.8.22" apply false
+    id "com.android.application" version "8.4.0" apply false
+    id "org.jetbrains.kotlin.android" version "1.9.24" apply false
 }
 
 include ":app"
