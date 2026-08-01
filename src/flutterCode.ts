@@ -4785,6 +4785,16 @@ class _AttendanceAdvancesViewState extends State<AttendanceAdvancesView> {
 `
   },
   {
+    path: "android/gradle/wrapper/gradle-wrapper.properties",
+    language: "properties",
+    content: `distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip
+`
+  },
+  {
     path: "android/settings.gradle",
     language: "groovy",
     content: `pluginManagement {
