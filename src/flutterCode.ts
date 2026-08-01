@@ -4785,6 +4785,47 @@ class _AttendanceAdvancesViewState extends State<AttendanceAdvancesView> {
 `
   },
   {
+    path: "android/settings.gradle",
+    language: "groovy",
+    content: `pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        def file = new File(rootProject.projectDir, "local.properties")
+        if (file.exists()) {
+            properties.load(file.newDataInputStream())
+        }
+        def sdkPath = properties.getProperty("flutter.sdk")
+        assert sdkPath != null, "flutter.sdk not set in local.properties"
+        return sdkPath
+    }()
+
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "8.3.0" apply false
+    id "org.jetbrains.kotlin.android" version "1.8.22" apply false
+}
+
+include ":app"
+`
+  },
+  {
+    path: "android/gradle.properties",
+    language: "properties",
+    content: `org.gradle.jvmargs=-Xmx4096M
+android.useAndroidX=true
+android.enableJetifier=true
+`
+  },
+  {
     path: "android/build.gradle",
     language: "groovy",
     content: `allprojects {
