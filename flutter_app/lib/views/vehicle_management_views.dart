@@ -386,8 +386,7 @@ class VehicleDetailView extends StatelessWidget {
 
               if (no != null && expiry != null) {
                 daysLeft = expiry.difference(today).inDays;
-                subtitle = "No: $no
-Expires: ${expiry.toIso8601String().split('T')[0]}";
+                subtitle = "No: $no\nExpires: ${expiry.toIso8601String().split('T')[0]}";
                 if (daysLeft <= 0) {
                   subtitle += ' (EXPIRED)';
                   statusColor = Colors.red;

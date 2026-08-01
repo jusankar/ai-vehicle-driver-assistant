@@ -594,7 +594,7 @@ class DriverDetailView extends StatelessWidget {
                           style: const TextStyle(fontSize: 11),
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, py: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: chipColor.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(8),
@@ -669,7 +669,7 @@ class DriverDetailView extends StatelessWidget {
             children: [
               Text('Salary Advances', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, py: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
                 child: Text(
                   'Outstanding: ₹${driver.advance.toStringAsFixed(0)}',
