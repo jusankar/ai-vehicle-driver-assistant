@@ -6,9 +6,10 @@ import * as schema from './schema.ts';
 export const createPool = () => {
   return new Pool({
     host: process.env.SQL_HOST || 'localhost',
+    port: Number(process.env.SQL_PORT || 5432),
     user: process.env.SQL_USER || 'postgres',
-    password: process.env.SQL_PASSWORD || '',
-    database: process.env.SQL_DB_NAME || 'postgres',
+    password: process.env.SQL_PASSWORD || 'V3h1cl3',
+    database: process.env.SQL_DB_NAME || 'ai_vehicle_data',
     connectionTimeoutMillis: 3000,
   });
 };
