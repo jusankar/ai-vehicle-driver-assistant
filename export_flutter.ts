@@ -26,8 +26,8 @@ for (const file of flutterProjectFiles) {
 }
 
 console.log(`\n✅ Success! Created ${fileCount} files in directory: ${outputDir}`);
-console.log(`\nNext Steps for Flutter in Cursor:`);
+console.log(`\nNext Steps to run on your phone/device:`);
 console.log(` 1. cd flutter_app`);
-console.log(` 2. flutter create .`);
-console.log(` 3. flutter pub get`);
-console.log(` 4. flutter run -d c2badf08`);
+console.log(` 2. flutter pub get`);
+console.log(` 3. flutter run -d c2badf08`);
+console.log(`\nNote: If you ever run "flutter create .", ALWAYS re-run "npm run export:flutter" from the project root afterward so your main.dart is not replaced by the default counter demo app!`);
