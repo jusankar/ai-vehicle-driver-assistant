@@ -28,5 +28,6 @@ for (const file of flutterProjectFiles) {
 console.log(`\n✅ Success! Created ${fileCount} files in directory: ${outputDir}`);
 console.log(`\nNext Steps for Flutter in Cursor:`);
 console.log(` 1. cd flutter_app`);
-console.log(` 2. flutter pub get`);
-console.log(` 3. flutter build apk --release`);
+console.log(` 2. flutter create .`);
+console.log(` 3. flutter pub get`);
+console.log(` 4. flutter run -d c2badf08`);
