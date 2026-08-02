@@ -381,31 +381,32 @@ app.get("/api/fleet", async (req, res) => {
   }
 });
 
-// 2. POST to reset fleet database
-app.post("/api/fleet/reset", async (req, res) => {
-  try {
-    console.log("Resetting database to original seed...");
-    // Drop records from tables sequentially to avoid FK issues
-    await db.delete(notifications);
-    await db.delete(tripHistory);
-    await db.delete(serviceHistory);
-    await db.delete(fuelLogs);
-    await db.delete(vehicleExpenses);
-    await db.delete(vehicleDocuments);
-    await db.delete(vehicles);
-    await db.delete(driverAttendance);
-    await db.delete(driverAdvances);
-    await db.delete(drivers);
-    await db.delete(kbEmbeddings);
+// 2. POST to reset / clear fleet database
+const clearAllDatabaseTables = async () => {
+  await db.delete(reminders);
+  await db.delete(notifications);
+  await db.delete(tripHistory);
+  await db.delete(serviceHistory);
+  await db.delete(fuelLogs);
+  await db.delete(vehicleExpenses);
+  await db.delete(vehicleDocuments);
+  await db.delete(vehicles);
+  await db.delete(driverAttendance);
+  await db.delete(driverAdvances);
+  await db.delete(drivers);
+  await db.delete(kbEmbeddings);
+};
 
-    // Call seed
-    await seedDatabase();
+app.post(["/api/fleet/reset", "/api/fleet/clear"], async (req, res) => {
+  try {
+    console.log("Clearing all database records for fresh data feed...");
+    await clearAllDatabaseTables();
 
     const state = await getFullFleetState();
     res.json({ status: "success", database: state });
   } catch (error: any) {
-    console.error("Failed to reset database:", error);
-    res.status(500).json({ error: "Failed to reset database", details: error.message });
+    console.error("Failed to clear database:", error);
+    res.status(500).json({ error: "Failed to clear database", details: error.message });
   }
 });
 
@@ -1265,7 +1266,7 @@ IMPORTANT DIRECTIONS:
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: contents,
       config: {
         systemInstruction: systemInstruction + "\n\n" + dbContext,
@@ -1508,7 +1509,7 @@ Guidelines:
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: { parts: [docPart, textPart] },
       config: {
         responseMimeType: "application/json",
@@ -1720,9 +1721,11 @@ async function startServer() {
     console.log(`AI Vehicle & Driver Assistant server running on http://localhost:${PORT}`);
   });
 
-  // Trigger initial database seeding asynchronously after port 3000 is listening
-  seedDatabase().catch((err) => {
-    console.error("Initial database seeding failed:", err);
+  // Wipe dummy seed data on startup for new data feed
+  clearAllDatabaseTables().then(() => {
+    console.log("Database successfully cleared of dummy seed data. Ready for new data feed.");
+  }).catch((err) => {
+    console.error("Database clear on startup failed:", err);
   });
 }
 

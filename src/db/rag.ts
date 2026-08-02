@@ -18,7 +18,7 @@ const ai = new GoogleGenAI({
 export async function retrieveRelevantContext(query: string, limit = 3): Promise<string[]> {
   try {
     const embedRes = await ai.models.embedContent({
-      model: "gemini-embedding-2-preview",
+      model: "text-embedding-004",
       contents: query
     });
 

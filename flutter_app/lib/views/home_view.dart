@@ -7,8 +7,80 @@ import 'vehicle_management_views.dart';
 import 'document_vault_view.dart';
 import 'driver_management_views.dart';
 
-class HomeView extends StatelessWidget {
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
+
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      _HomeDashboardContent(
+        onNavigateTab: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+      ),
+      const VehicleListView(),
+      const DriverListView(),
+      const DocumentVaultView(),
+      const ChatView(),
+    ];
+
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (int index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.local_shipping_outlined),
+            selectedIcon: Icon(Icons.local_shipping),
+            label: 'Vehicles',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.badge_outlined),
+            selectedIcon: Icon(Icons.badge),
+            label: 'Drivers',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder),
+            label: 'Vault',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.auto_awesome_outlined),
+            selectedIcon: Icon(Icons.auto_awesome),
+            label: 'AI Chat',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeDashboardContent extends StatelessWidget {
+  final Function(int) onNavigateTab;
+
+  const _HomeDashboardContent({required this.onNavigateTab});
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +117,7 @@ class HomeView extends StatelessWidget {
               _buildHeaderCard(context, theme),
               const SizedBox(height: 24),
 
-              // Fleet Portal Portal Section
+              // Fleet Portal Section
               Text(
                 'Fleet Actions',
                 style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -66,12 +138,7 @@ class HomeView extends StatelessWidget {
                   title: const Text('Fleet Operations Portal', style: TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: const Text('Manage compliance document vaults, spec logs, services, and trip records for your active trucks.'),
                   trailing: Icon(Icons.arrow_right_alt, color: theme.colorScheme.primary),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const VehicleListView()),
-                    );
-                  },
+                  onTap: () => onNavigateTab(1),
                 ),
               ),
               const SizedBox(height: 12),
@@ -91,12 +158,7 @@ class HomeView extends StatelessWidget {
                   title: const Text('Driver & Attendance Roster', style: TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: const Text('Track active duty status, log daily attendance, issue advances, manage salary rate calculations, and upload compliance credentials.'),
                   trailing: Icon(Icons.arrow_right_alt, color: theme.colorScheme.tertiary),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const DriverListView()),
-                    );
-                  },
+                  onTap: () => onNavigateTab(2),
                 ),
               ),
               const SizedBox(height: 12),
@@ -116,12 +178,7 @@ class HomeView extends StatelessWidget {
                   title: const Text('Central Cloud Document Vault', style: TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: const Text('AES-256 cloud encrypted repository for Insurance, RC, Fitness, and salary receipts.'),
                   trailing: Icon(Icons.arrow_right_alt, color: theme.colorScheme.secondary),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const DocumentVaultView()),
-                    );
-                  },
+                  onTap: () => onNavigateTab(3),
                 ),
               ),
               const SizedBox(height: 24),
@@ -153,29 +210,19 @@ class HomeView extends StatelessWidget {
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ChatView()),
-                      );
-                    },
+                    onPressed: () => onNavigateTab(4),
                     child: const Text('Open Chat'),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              _buildRecentConversations(context, chatVM),
+              _buildRecentConversations(context, chatVM, onNavigateTab),
             ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ChatView()),
-          );
-        },
+        onPressed: () => onNavigateTab(4),
         icon: const Icon(Icons.chat_bubble_outline),
         label: const Text('Ask Assistant'),
       ),
@@ -340,7 +387,7 @@ class HomeView extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentConversations(BuildContext context, ChatViewModel chatVM) {
+  Widget _buildRecentConversations(BuildContext context, ChatViewModel chatVM, Function(int) onNavigateTab) {
     final theme = Theme.of(context);
     final lastMessage = chatVM.messages.last;
 
@@ -363,12 +410,7 @@ class HomeView extends StatelessWidget {
           style: theme.textTheme.bodySmall,
         ),
         trailing: const Icon(Icons.chevron_right, size: 16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ChatView()),
-          );
-        },
+        onTap: () => onNavigateTab(4),
       ),
     );
   }
