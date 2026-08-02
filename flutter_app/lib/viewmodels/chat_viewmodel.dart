@@ -18,11 +18,15 @@ class ChatViewModel extends ChangeNotifier {
   bool _isLoading = false;
   late final GenerativeModel _model;
 
-  ChatViewModel({String apiKey = "YOUR_GEMINI_API_KEY"}) {
+  ChatViewModel({String? apiKey}) {
+    final key = (apiKey != null && apiKey.isNotEmpty && apiKey != "YOUR_GEMINI_API_KEY")
+        ? apiKey
+        : const String.fromEnvironment('GEMINI_API_KEY', defaultValue: 'AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc');
+    
     // Initialize Google Generative AI
     _model = GenerativeModel(
-      model: 'gemini-1.5-flash', // Replaced with latest supported in target environment
-      apiKey: apiKey,
+      model: 'gemini-1.5-flash',
+      apiKey: key,
     );
   }
 
