@@ -286,27 +286,23 @@ class _HomeDashboardContent extends StatelessWidget {
     List<String> issues = [];
     final now = DateTime.now();
     for (var v in vehicles) {
-      if (v.insuranceExpiry != null && v.insuranceExpiry!.isNotEmpty) {
-        try {
-          final exp = DateTime.parse(v.insuranceExpiry!);
-          final diffDays = exp.difference(now).inDays;
-          if (diffDays <= 30 && diffDays >= 0) {
-            issues.add('${v.plateNumber} ${vm.tr("Insurance expires in", "இன்சூரன்ஸ் முடிவு")} $diffDays ${vm.tr("days", "நாட்களில்")}');
-          } else if (diffDays < 0) {
-            issues.add('${v.plateNumber} ${vm.tr("Insurance EXPIRED", "இன்சூரன்ஸ் முடிந்தது")}');
-          }
-        } catch (_) {}
+      if (v.insuranceExpiry != null) {
+        final exp = v.insuranceExpiry!;
+        final diffDays = exp.difference(now).inDays;
+        if (diffDays <= 30 && diffDays >= 0) {
+          issues.add('${v.plateNumber} ${vm.tr("Insurance expires in", "இன்சூரன்ஸ் முடிவு")} $diffDays ${vm.tr("days", "நாட்களில்")}');
+        } else if (diffDays < 0) {
+          issues.add('${v.plateNumber} ${vm.tr("Insurance EXPIRED", "இன்சூரன்ஸ் முடிந்தது")}');
+        }
       }
-      if (v.fitnessExpiry != null && v.fitnessExpiry!.isNotEmpty) {
-        try {
-          final exp = DateTime.parse(v.fitnessExpiry!);
-          final diffDays = exp.difference(now).inDays;
-          if (diffDays <= 30 && diffDays >= 0) {
-            issues.add('${v.plateNumber} ${vm.tr("Fitness FC expires in", "FC முடிவு")} $diffDays ${vm.tr("days", "நாட்களில்")}');
-          } else if (diffDays < 0) {
-            issues.add('${v.plateNumber} ${vm.tr("Fitness FC EXPIRED", "FC முடிந்தது")}');
-          }
-        } catch (_) {}
+      if (v.fitnessExpiry != null) {
+        final exp = v.fitnessExpiry!;
+        final diffDays = exp.difference(now).inDays;
+        if (diffDays <= 30 && diffDays >= 0) {
+          issues.add('${v.plateNumber} ${vm.tr("Fitness FC expires in", "FC முடிவு")} $diffDays ${vm.tr("days", "நாட்களில்")}');
+        } else if (diffDays < 0) {
+          issues.add('${v.plateNumber} ${vm.tr("Fitness FC EXPIRED", "FC முடிந்தது")}');
+        }
       }
     }
 
