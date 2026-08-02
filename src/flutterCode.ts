@@ -564,8 +564,6 @@ class FleetViewModel extends ChangeNotifier {
         .fold(0.0, (sum, item) => sum + item.amount);
   }
 
-  final List<CloudDocument> _uploadedDocuments = [];
-
   List<CloudDocument> get uploadedDocuments => _uploadedDocuments;
 
   void addCloudDocument(CloudDocument doc) {
