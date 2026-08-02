@@ -1883,7 +1883,9 @@ class _ChatViewState extends State<ChatView> {
         SnackBar(content: Text('Unable to pick document: \$e')),
       );
     }
-   void _showServerSettingsDialog() {
+  }
+
+  void _showServerSettingsDialog() {
     final chatVM = context.read<ChatViewModel>();
     final urlController = TextEditingController(text: chatVM.serverUrl);
     final keyController = TextEditingController(text: chatVM.apiKey);
