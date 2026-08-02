@@ -1040,14 +1040,27 @@ class ChatViewModel extends ChangeNotifier {
   late final GenerativeModel _model;
 
   ChatViewModel({String? apiKey}) {
-    final key = (apiKey != null && apiKey.isNotEmpty && apiKey != "YOUR_GEMINI_API_KEY")
+    final key = (apiKey != null && apiKey.isNotEmpty && apiKey != "YOUR_GEMINI_API_KEY" && apiKey != "GEMINI_API_KEY_HERE")
         ? apiKey
         : const String.fromEnvironment('GEMINI_API_KEY', defaultValue: 'AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc');
     
+    final systemInstructionText = """
+You are the AI core for "AI Vehicle & Driver Assistant", answering queries for commercial fleet owners.
+Provide brief, highly readable, bulleted answers.
+If the user asks to log/add fuel, expenses, or assign a driver, output a structured action block at the end:
+[DATABASE_ACTION_START]
+{
+  "action": "ADD_FUEL" | "ADD_EXPENSE" | "ASSIGN_DRIVER",
+  "payload": { ... }
+}
+[DATABASE_ACTION_END]
+""";
+
     // Initialize Google Generative AI
     _model = GenerativeModel(
       model: 'gemini-1.5-flash',
       apiKey: key,
+      systemInstruction: Content.system(systemInstructionText),
     );
   }
 
@@ -1072,7 +1085,7 @@ class ChatViewModel extends ChangeNotifier {
     try {
       // Prepare Fleet Context for LLM Grounding
       final dbContext = """
-Current local date: 2026-07-17.
+Current local date: 2026-08-01.
 FLEET DATABASE STATUS:
 Vehicles: \${jsonEncode(fleetVM.vehicles.map((v) => v.toJson()).toList())}
 Drivers: \${jsonEncode(fleetVM.drivers.map((d) => d.toJson()).toList())}
@@ -1080,26 +1093,22 @@ Fuel Logs: \${jsonEncode(fleetVM.fuelLogs.map((f) => f.toJson()).toList())}
 Expense Logs: \${jsonEncode(fleetVM.expenseLogs.map((e) => e.toJson()).toList())}
 """;
 
-      final systemInstruction = """
-You are the AI core for "AI Vehicle & Driver Assistant", answering queries for commercial fleet owners.
-Provide brief, highly readable, bulleted answers.
-If the user asks to log/add fuel, expenses, or assign a driver, output a structured action block at the end:
-[DATABASE_ACTION_START]
-{
-  "action": "ADD_FUEL" | "ADD_EXPENSE" | "ASSIGN_DRIVER",
-  "payload": { ... }
-}
-[DATABASE_ACTION_END]
-""";
+      final contents = <Content>[];
+      
+      // Pass grounding context as first user prompt
+      contents.add(Content.text("FLEET DATABASE CONTEXT:\n\$dbContext"));
+      
+      // Append history & new message
+      for (final msg in _messages) {
+        if (msg.id == "init") continue;
+        if (msg.sender == MessageSender.user) {
+          contents.add(Content.text(msg.text));
+        } else {
+          contents.add(Content.model([TextPart(msg.text)]));
+        }
+      }
 
-      final response = await _model.generateContent([
-        Content.system(systemInstruction),
-        Content.text(dbContext),
-        ..._messages.map((m) => m.sender == MessageSender.user 
-            ? Content.text("User: " + m.text) 
-            : Content.model([TextPart(m.text)])),
-        Content.text("User: " + text)
-      ]);
+      final response = await _model.generateContent(contents);
 
       final replyText = response.text ?? "I was unable to retrieve an answer.";
       
@@ -3861,7 +3870,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => FleetViewModel()),
-        ChangeNotifierProvider(create: (_) => ChatViewModel(apiKey: "GEMINI_API_KEY_HERE")),
+        ChangeNotifierProvider(create: (_) => ChatViewModel(apiKey: "AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc")),
       ],
       child: MaterialApp(
         title: 'AI Vehicle & Driver Assistant',
