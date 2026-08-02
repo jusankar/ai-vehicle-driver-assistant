@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => FleetViewModel()),
-        ChangeNotifierProvider(create: (_) => ChatViewModel(apiKey: "AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc")),
+        ChangeNotifierProvider(create: (_) => ChatViewModel()),
       ],
       child: MaterialApp(
         title: 'AI Vehicle & Driver Assistant',

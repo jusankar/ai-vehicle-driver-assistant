@@ -17,14 +17,18 @@ class ChatViewModel extends ChangeNotifier {
   ];
   
   bool _isLoading = false;
-  late final GenerativeModel _model;
+  late GenerativeModel _model;
   String _serverUrl = "https://ais-dev-czqawmg62uwikhqbydfl6w-236723801382.asia-southeast1.run.app";
+  String _apiKey = const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
 
   ChatViewModel({String? apiKey}) {
-    final key = (apiKey != null && apiKey.isNotEmpty && apiKey != "YOUR_GEMINI_API_KEY" && apiKey != "GEMINI_API_KEY_HERE")
-        ? apiKey
-        : const String.fromEnvironment('GEMINI_API_KEY', defaultValue: 'AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc');
-    
+    if (apiKey != null && apiKey.isNotEmpty && !apiKey.startsWith('AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc') && apiKey != "YOUR_GEMINI_API_KEY") {
+      _apiKey = apiKey;
+    }
+    _initModel();
+  }
+
+  void _initModel() {
     final systemInstructionText = """
 You are the AI core for "AI Vehicle & Driver Assistant", answering queries for commercial fleet owners.
 Provide brief, highly readable, bulleted answers.
@@ -37,10 +41,9 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
 [DATABASE_ACTION_END]
 """;
 
-    // Initialize Google Generative AI with updated gemini-2.5-flash
     _model = GenerativeModel(
       model: 'gemini-2.5-flash',
-      apiKey: key,
+      apiKey: _apiKey.isNotEmpty ? _apiKey : 'UNCONFIGURED_KEY',
       systemInstruction: Content.system(systemInstructionText),
     );
   }
@@ -48,10 +51,19 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
   List<ChatMessage> get messages => _messages;
   bool get isLoading => _isLoading;
   String get serverUrl => _serverUrl;
+  String get apiKey => _apiKey;
 
   void setServerUrl(String url) {
     if (url.trim().isNotEmpty) {
       _serverUrl = url.trim().replaceAll(RegExp(r'/$'), '');
+      notifyListeners();
+    }
+  }
+
+  void setApiKey(String key) {
+    if (key.trim().isNotEmpty) {
+      _apiKey = key.trim();
+      _initModel();
       notifyListeners();
     }
   }

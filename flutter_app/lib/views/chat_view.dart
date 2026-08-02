@@ -101,11 +101,10 @@ class _ChatViewState extends State<ChatView> {
         SnackBar(content: Text('Unable to pick document: $e')),
       );
     }
-  }
-
-  void _showServerSettingsDialog() {
+   void _showServerSettingsDialog() {
     final chatVM = context.read<ChatViewModel>();
     final urlController = TextEditingController(text: chatVM.serverUrl);
+    final keyController = TextEditingController(text: chatVM.apiKey);
 
     showDialog(
       context: context,
@@ -114,33 +113,51 @@ class _ChatViewState extends State<ChatView> {
           children: [
             Icon(Icons.tune, color: Colors.blue),
             SizedBox(width: 8),
-            Text('AI Server Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('AI & Server Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Backend Server URL:',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: urlController,
-              decoration: InputDecoration(
-                hintText: 'https://ais-dev-...run.app or http://10.0.2.2:3000',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Backend Server URL:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               ),
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'When connected, AI prompts route through server-side Gemini 2.5 Flash for grounded fleet insights & auto database logging.',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
+              const SizedBox(height: 6),
+              TextField(
+                controller: urlController,
+                decoration: InputDecoration(
+                  hintText: 'https://ais-dev-...run.app or http://10.0.2.2:3000',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Gemini API Key (Direct Device Fallback):',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: keyController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  hintText: 'Enter AIzaSy... API key',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Enter your new Gemini API Key here to update mobile AI capabilities directly.',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -150,12 +167,15 @@ class _ChatViewState extends State<ChatView> {
           ElevatedButton(
             onPressed: () {
               chatVM.setServerUrl(urlController.text);
+              if (keyController.text.trim().isNotEmpty) {
+                chatVM.setApiKey(keyController.text.trim());
+              }
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Server endpoint updated to: ${chatVM.serverUrl}')),
+                const SnackBar(content: Text('AI settings updated successfully!')),
               );
             },
-            child: const Text('Save Endpoint'),
+            child: const Text('Save Settings'),
           ),
         ],
       ),

@@ -893,14 +893,18 @@ class ChatViewModel extends ChangeNotifier {
   ];
   
   bool _isLoading = false;
-  late final GenerativeModel _model;
+  late GenerativeModel _model;
   String _serverUrl = "https://ais-dev-czqawmg62uwikhqbydfl6w-236723801382.asia-southeast1.run.app";
+  String _apiKey = const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
 
   ChatViewModel({String? apiKey}) {
-    final key = (apiKey != null && apiKey.isNotEmpty && apiKey != "YOUR_GEMINI_API_KEY" && apiKey != "GEMINI_API_KEY_HERE")
-        ? apiKey
-        : const String.fromEnvironment('GEMINI_API_KEY', defaultValue: 'AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc');
-    
+    if (apiKey != null && apiKey.isNotEmpty && !apiKey.startsWith('AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc') && apiKey != "YOUR_GEMINI_API_KEY") {
+      _apiKey = apiKey;
+    }
+    _initModel();
+  }
+
+  void _initModel() {
     final systemInstructionText = """
 You are the AI core for "AI Vehicle & Driver Assistant", answering queries for commercial fleet owners.
 Provide brief, highly readable, bulleted answers.
@@ -913,10 +917,9 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
 [DATABASE_ACTION_END]
 """;
 
-    // Initialize Google Generative AI with updated gemini-2.5-flash
     _model = GenerativeModel(
       model: 'gemini-2.5-flash',
-      apiKey: key,
+      apiKey: _apiKey.isNotEmpty ? _apiKey : 'UNCONFIGURED_KEY',
       systemInstruction: Content.system(systemInstructionText),
     );
   }
@@ -924,10 +927,19 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
   List<ChatMessage> get messages => _messages;
   bool get isLoading => _isLoading;
   String get serverUrl => _serverUrl;
+  String get apiKey => _apiKey;
 
   void setServerUrl(String url) {
     if (url.trim().isNotEmpty) {
       _serverUrl = url.trim().replaceAll(RegExp(r'/$'), '');
+      notifyListeners();
+    }
+  }
+
+  void setApiKey(String key) {
+    if (key.trim().isNotEmpty) {
+      _apiKey = key.trim();
+      _initModel();
       notifyListeners();
     }
   }
@@ -1871,11 +1883,10 @@ class _ChatViewState extends State<ChatView> {
         SnackBar(content: Text('Unable to pick document: \$e')),
       );
     }
-  }
-
-  void _showServerSettingsDialog() {
+   void _showServerSettingsDialog() {
     final chatVM = context.read<ChatViewModel>();
     final urlController = TextEditingController(text: chatVM.serverUrl);
+    final keyController = TextEditingController(text: chatVM.apiKey);
 
     showDialog(
       context: context,
@@ -1884,33 +1895,51 @@ class _ChatViewState extends State<ChatView> {
           children: [
             Icon(Icons.tune, color: Colors.blue),
             SizedBox(width: 8),
-            Text('AI Server Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('AI & Server Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Backend Server URL:',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: urlController,
-              decoration: InputDecoration(
-                hintText: 'https://ais-dev-...run.app or http://10.0.2.2:3000',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Backend Server URL:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               ),
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'When connected, AI prompts route through server-side Gemini 2.5 Flash for grounded fleet insights & auto database logging.',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
+              const SizedBox(height: 6),
+              TextField(
+                controller: urlController,
+                decoration: InputDecoration(
+                  hintText: 'https://ais-dev-...run.app or http://10.0.2.2:3000',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Gemini API Key (Direct Device Fallback):',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: keyController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  hintText: 'Enter AIzaSy... API key',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Enter your new Gemini API Key here to update mobile AI capabilities directly.',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -1920,12 +1949,15 @@ class _ChatViewState extends State<ChatView> {
           ElevatedButton(
             onPressed: () {
               chatVM.setServerUrl(urlController.text);
+              if (keyController.text.trim().isNotEmpty) {
+                chatVM.setApiKey(keyController.text.trim());
+              }
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Server endpoint updated to: \${chatVM.serverUrl}')),
+                const SnackBar(content: Text('AI settings updated successfully!')),
               );
             },
-            child: const Text('Save Endpoint'),
+            child: const Text('Save Settings'),
           ),
         ],
       ),
@@ -4075,7 +4107,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => FleetViewModel()),
-        ChangeNotifierProvider(create: (_) => ChatViewModel(apiKey: "AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc")),
+        ChangeNotifierProvider(create: (_) => ChatViewModel()),
       ],
       child: MaterialApp(
         title: 'AI Vehicle & Driver Assistant',
