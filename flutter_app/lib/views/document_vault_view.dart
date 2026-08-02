@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/cloud_document.dart';
 import '../models/fleet_model.dart';
 import '../viewmodels/fleet_viewmodel.dart';
@@ -16,7 +18,9 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
   final _notesController = TextEditingController();
   String _selectedType = 'Insurance PDF';
   String _selectedSource = 'PDF';
-  String? _simulatedFilePath;
+  
+  String? _pickedFileName;
+  String? _pickedFileSize;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
 
@@ -40,12 +44,52 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
     super.dispose();
   }
 
-  void _simulateUpload() async {
-    if (_selectedSource != 'PDF' && _simulatedFilePath == null) {
+  Future<void> _pickFile() async {
+    try {
+      if (_selectedSource == 'Camera') {
+        final picker = ImagePicker();
+        final XFile? image = await picker.pickImage(source: ImageSource.camera);
+        if (image != null) {
+          final length = await image.length();
+          setState(() {
+            _pickedFileName = image.name;
+            _pickedFileSize = (length / 1024).toStringAsFixed(1) + ' KB';
+          });
+        }
+      } else if (_selectedSource == 'Gallery') {
+        final picker = ImagePicker();
+        final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+        if (image != null) {
+          final length = await image.length();
+          setState(() {
+            _pickedFileName = image.name;
+            _pickedFileSize = (length / 1024).toStringAsFixed(1) + ' KB';
+          });
+        }
+      } else {
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'xls', 'xlsx'],
+        );
+        if (result != null && result.files.isNotEmpty) {
+          final file = result.files.first;
+          setState(() {
+            _pickedFileName = file.name;
+            _pickedFileSize = (file.size / 1024).toStringAsFixed(1) + ' KB';
+          });
+        }
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select or capture a file first.')),
+        SnackBar(content: Text('File picker error: $e')),
       );
-      return;
+    }
+  }
+
+  void _simulateUpload() async {
+    if (_pickedFileName == null) {
+      await _pickFile();
+      if (_pickedFileName == null) return;
     }
 
     setState(() {
@@ -54,7 +98,7 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
     });
 
     for (int i = 1; i <= 5; i++) {
-      await Future.delayed(const Duration(milliseconds: 350));
+      await Future.delayed(const Duration(milliseconds: 300));
       setState(() {
         _uploadProgress = i * 0.2;
       });
@@ -63,14 +107,12 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
     final fleetVM = context.read<FleetViewModel>();
     final newDoc = CloudDocument(
       id: 'cd_${DateTime.now().millisecondsSinceEpoch}',
-      name: _selectedSource == 'PDF' 
-          ? 'scanned_${_selectedType.toLowerCase().replaceAll(' ', '_')}.pdf'
-          : 'captured_${_selectedType.toLowerCase().replaceAll(' ', '_')}.jpg',
+      name: _pickedFileName ?? 'document_${DateTime.now().millisecondsSinceEpoch}.pdf',
       documentType: _selectedType,
       source: _selectedSource,
       uploadedAt: DateTime.now(),
-      fileSize: _selectedSource == 'PDF' ? '1.8 MB' : '920 KB',
-      storageUrl: 'https://storage.googleapis.com/fleet-cloud-bucket/doc_${DateTime.now().millisecondsSinceEpoch}.${_selectedSource == 'PDF' ? 'pdf' : 'jpg'}',
+      fileSize: _pickedFileSize ?? '1.2 MB',
+      storageUrl: 'https://storage.googleapis.com/fleet-cloud-bucket/doc_${DateTime.now().millisecondsSinceEpoch}',
       notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
     );
 
@@ -78,14 +120,15 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
 
     setState(() {
       _isUploading = false;
-      _simulatedFilePath = null;
+      _pickedFileName = null;
+      _pickedFileSize = null;
       _notesController.clear();
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: Colors.green,
-        content: Text('"${newDoc.name}" uploaded & encrypted securely in AES-256 Cloud Vault!'),
+        content: Text('"${newDoc.name}" uploaded & saved securely in Centralized Vault!'),
       ),
     );
   }
@@ -222,7 +265,8 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
                                     if (val != null) {
                                       setState(() {
                                         _selectedSource = val;
-                                        _simulatedFilePath = null;
+                                        _pickedFileName = null;
+                                        _pickedFileSize = null;
                                       });
                                     }
                                   },
@@ -244,45 +288,36 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
                         ),
                         child: Column(
                           children: [
-                            if (_selectedSource == 'PDF') ...[
-                              Icon(Icons.picture_as_pdf, size: 40, color: theme.colorScheme.primary.withOpacity(0.7)),
+                            if (_pickedFileName != null) ...[
+                              const Icon(Icons.insert_drive_file, size: 40, color: Colors.green),
                               const SizedBox(height: 12),
-                              const Text('PDF Document Selected', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text(_pickedFileName!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center),
                               const SizedBox(height: 4),
-                              Text('Simulating dynamic attachment up to 10MB', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                            ] else if (_simulatedFilePath == null) ...[
-                              Icon(_selectedSource == 'Camera' ? Icons.camera_alt_outlined : Icons.photo_library_outlined, size: 40, color: theme.colorScheme.secondary),
+                              Text('Size: ${_pickedFileSize ?? "Unknown"}', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () => setState(() {
+                                  _pickedFileName = null;
+                                  _pickedFileSize = null;
+                                }),
+                                child: const Text('Change Selected File', style: TextStyle(color: Colors.red, fontSize: 12)),
+                              )
+                            ] else ...[
+                              Icon(
+                                _selectedSource == 'Camera'
+                                    ? Icons.camera_alt_outlined
+                                    : (_selectedSource == 'Gallery' ? Icons.photo_library_outlined : Icons.picture_as_pdf),
+                                size: 40,
+                                color: theme.colorScheme.primary,
+                              ),
                               const SizedBox(height: 12),
-                              Text(_selectedSource == 'Camera' ? 'Ready to Capture Receipt' : 'Select from Photo Gallery', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text('Select ${_selectedSource} file to attach', style: const TextStyle(fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
                               ElevatedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _simulatedFilePath = 'assets/simulated_receipt_${_selectedType.toLowerCase().replaceAll(' ', '_')}.jpg';
-                                  });
-                                },
-                                icon: Icon(_selectedSource == 'Camera' ? Icons.camera : Icons.photo),
-                                label: Text(_selectedSource == 'Camera' ? 'Trigger Snapshot' : 'Browse Gallery'),
+                                onPressed: _pickFile,
+                                icon: Icon(_selectedSource == 'Camera' ? Icons.camera : Icons.attach_file),
+                                label: Text(_selectedSource == 'Camera' ? 'Take Snapshot' : 'Browse File'),
                               ),
-                            ] else ...[
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  width: 140,
-                                  height: 80,
-                                  color: Colors.black12,
-                                  child: const Center(
-                                    child: Icon(Icons.check_circle, color: Colors.green, size: 36),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text('Receipt Image Attached!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              TextButton(
-                                onPressed: () => setState(() => _simulatedFilePath = null),
-                                child: const Text('Remove Snapshot', style: TextStyle(color: Colors.red)),
-                              )
                             ],
                           ],
                         ),

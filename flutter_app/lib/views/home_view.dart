@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../viewmodels/fleet_viewmodel.dart';
 import '../viewmodels/chat_viewmodel.dart';
+import '../models/cloud_document.dart';
 import 'chat_view.dart';
 import 'vehicle_management_views.dart';
 import 'document_vault_view.dart';
 import 'driver_management_views.dart';
+import 'reports_view.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -30,6 +34,7 @@ class _HomeViewState extends State<HomeView> {
       const VehicleListView(),
       const DriverListView(),
       const DocumentVaultView(),
+      const ReportsView(),
       const ChatView(),
     ];
 
@@ -67,6 +72,11 @@ class _HomeViewState extends State<HomeView> {
             label: 'Vault',
           ),
           NavigationDestination(
+            icon: Icon(Icons.bar_chart_outlined),
+            selectedIcon: Icon(Icons.bar_chart),
+            label: 'Reports',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
             selectedIcon: Icon(Icons.auto_awesome),
             label: 'AI Chat',
@@ -95,13 +105,19 @@ class _HomeDashboardContent extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          IconButton(
-            icon: const Badge(
-              label: Text('2'),
-              child: Icon(Icons.notifications_outlined),
-            ),
-            onPressed: () {
-              _showNotificationsDialog(context);
+          Consumer<FleetViewModel>(
+            builder: (context, vm, child) {
+              final notifCount = vm.getNotifications().length;
+              return IconButton(
+                icon: Badge(
+                  label: Text('$notifCount'),
+                  isLabelVisible: notifCount > 0,
+                  child: const Icon(Icons.notifications_outlined),
+                ),
+                onPressed: () {
+                  _showNotificationsDialog(context, vm);
+                },
+              );
             },
           ),
           const SizedBox(width: 8),
@@ -181,6 +197,26 @@ class _HomeDashboardContent extends StatelessWidget {
                   onTap: () => onNavigateTab(3),
                 ),
               ),
+              const SizedBox(height: 12),
+
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(color: theme.colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(16),
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.purple.withOpacity(0.12),
+                    child: const Icon(Icons.bar_chart, color: Colors.purple),
+                  ),
+                  title: const Text('Reports & Analytics', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Monthly operating cost analysis, fuel efficiency audit, driver salary ledger, and compliance expiries.'),
+                  trailing: const Icon(Icons.arrow_right_alt, color: Colors.purple),
+                  onTap: () => onNavigateTab(4),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // KPI Bento Grid
@@ -210,7 +246,7 @@ class _HomeDashboardContent extends StatelessWidget {
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   TextButton(
-                    onPressed: () => onNavigateTab(4),
+                    onPressed: () => onNavigateTab(5),
                     child: const Text('Open Chat'),
                   ),
                 ],
@@ -222,7 +258,7 @@ class _HomeDashboardContent extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => onNavigateTab(4),
+        onPressed: () => onNavigateTab(5),
         icon: const Icon(Icons.chat_bubble_outline),
         label: const Text('Ask Assistant'),
       ),
@@ -410,92 +446,232 @@ class _HomeDashboardContent extends StatelessWidget {
           style: theme.textTheme.bodySmall,
         ),
         trailing: const Icon(Icons.chevron_right, size: 16),
-        onTap: () => onNavigateTab(4),
+        onTap: () => onNavigateTab(5),
       ),
     );
   }
 
-  void _showNotificationsDialog(BuildContext context) {
+  void _showNotificationsDialog(BuildContext context, FleetViewModel fleetVM) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildNotificationTile(
-                context,
-                'Insurance Expiring Soon',
-                'Vehicle TN68CD5678 insurance expires in 8 days (July 25, 2026). Please renew.',
-                Colors.amber,
+      builder: (dialogCtx) {
+        return Consumer<FleetViewModel>(
+          builder: (context, vm, child) {
+            final notifications = vm.getNotifications();
+            return AlertDialog(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.notifications_active, size: 20),
+                      SizedBox(width: 8),
+                      Text('Notifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    ],
+                  ),
+                  if (notifications.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        vm.clearAllNotifications();
+                      },
+                      child: const Text('Clear All', style: TextStyle(fontSize: 12)),
+                    ),
+                ],
               ),
-              const Divider(),
-              _buildNotificationTile(
-                context,
-                'Fitness Certificate Due',
-                'Vehicle MH12GH3456 fitness certificate is due for renewal soon.',
-                Colors.blue,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          )
-        ],
-      ),
-    );
-  }
+              content: SizedBox(
+                width: double.maxFinite,
+                child: notifications.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, color: Colors.green, size: 48),
+                            SizedBox(height: 12),
+                            Text('All Caught Up!', style: TextStyle(fontWeight: FontWeight.bold)),
+                            SizedBox(height: 4),
+                            Text('No active notifications or compliance alerts.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: notifications.map((notif) {
+                            Color accentColor = Colors.blue;
+                            IconData iconData = Icons.info_outline;
+                            if (notif.type == 'alert') {
+                              accentColor = Colors.red;
+                              iconData = Icons.error_outline;
+                            } else if (notif.type == 'warning') {
+                              accentColor = Colors.amber.shade800;
+                              iconData = Icons.warning_amber_rounded;
+                            }
 
-  Widget _buildNotificationTile(BuildContext context, String title, String body, Color accentColor) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_amber_rounded, color: accentColor, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(body, style: theme.textTheme.bodySmall),
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: accentColor.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: accentColor.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(iconData, color: accentColor, size: 22),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          notif.title,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: accentColor,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          notif.message,
+                                          style: const TextStyle(fontSize: 12, height: 1.3),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          notif.date,
+                                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                                    onPressed: () {
+                                      vm.dismissNotification(notif.id);
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Close'),
+                ),
               ],
-            ),
-          )
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
   void _showMockUploadDialog(BuildContext context) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Upload Document / Invoice'),
-        content: const Text('Choose a fuel receipt, tolls bill, or insurance document to parse with AI and automatically update your fleet records.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Document uploaded successfully. Parsing with Gemini AI...')),
-              );
-            },
-            child: const Text('Pick Image/PDF'),
-          ),
-        ],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Upload Fleet Invoice / Document',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Select a document source to pick fuel bills, repair receipts, or compliance documents.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.blueContainer,
+                child: Icon(Icons.camera_alt, color: Colors.blue),
+              ),
+              title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Capture receipt directly with camera'),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final picker = ImagePicker();
+                final image = await picker.pickImage(source: ImageSource.camera);
+                if (image != null && context.mounted) {
+                  _processPickedFile(context, image.name, 'Camera Image', 'Fuel Bills');
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.greenContainer,
+                child: Icon(Icons.photo_library, color: Colors.green),
+              ),
+              title: const Text('Choose Image from Gallery', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Select receipt image from photo library'),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final picker = ImagePicker();
+                final image = await picker.pickImage(source: ImageSource.gallery);
+                if (image != null && context.mounted) {
+                  _processPickedFile(context, image.name, 'Gallery Image', 'Service Bills');
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.orangeContainer,
+                child: Icon(Icons.picture_as_pdf, color: Colors.orange),
+              ),
+              title: const Text('Select PDF or Document File', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Browse PDF, Word, or Excel file from storage'),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final result = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'],
+                );
+                if (result != null && result.files.isNotEmpty && context.mounted) {
+                  final file = result.files.first;
+                  _processPickedFile(context, file.name, 'PDF File', 'Insurance PDF');
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _processPickedFile(BuildContext context, String fileName, String source, String docType) {
+    final fleetVM = context.read<FleetViewModel>();
+    final newDoc = CloudDocument(
+      id: 'cd_${DateTime.now().millisecondsSinceEpoch}',
+      name: fileName,
+      documentType: docType,
+      source: source,
+      uploadedAt: DateTime.now(),
+      fileSize: '1.2 MB',
+      storageUrl: 'https://storage.googleapis.com/fleet-cloud-bucket/$fileName',
+      notes: 'Uploaded via Quick Actions',
+    );
+    fleetVM.addCloudDocument(newDoc);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.green,
+        content: Text('"$fileName" uploaded to Cloud Vault and parsed with Gemini AI!'),
       ),
     );
   }

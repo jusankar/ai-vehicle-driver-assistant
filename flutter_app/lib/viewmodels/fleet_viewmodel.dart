@@ -127,6 +127,108 @@ class FleetViewModel extends ChangeNotifier {
         .fold(0.0, (sum, item) => sum + item.amount);
   }
 
+  final Set<String> _dismissedNotificationIds = {};
+
+  void dismissNotification(String id) {
+    _dismissedNotificationIds.add(id);
+    notifyListeners();
+  }
+
+  void clearAllNotifications() {
+    final current = getNotifications();
+    for (final n in current) {
+      _dismissedNotificationIds.add(n.id);
+    }
+    notifyListeners();
+  }
+
+  List<FleetAppNotification> getNotifications() {
+    final List<FleetAppNotification> list = [];
+    final today = DateTime(2026, 7, 17);
+
+    for (final v in _vehicles) {
+      if (v.insuranceExpiry != null) {
+        final days = v.insuranceExpiry!.difference(today).inDays;
+        if (days <= 30) {
+          final id = 'notif_ins_${v.plateNumber}';
+          if (!_dismissedNotificationIds.contains(id)) {
+            list.add(FleetAppNotification(
+              id: id,
+              title: days <= 0 ? 'INSURANCE EXPIRED: ${v.plateNumber}' : 'Insurance Expiring: ${v.plateNumber}',
+              message: 'Vehicle ${v.plateNumber} (${v.name}) insurance ${days <= 0 ? "EXPIRED on ${v.insuranceExpiry.toString().split(" ")[0]}" : "expires in $days days (${v.insuranceExpiry.toString().split(" ")[0]})"}. Please renew.',
+              date: '2026-07-17',
+              type: days <= 0 ? 'alert' : 'warning',
+            ));
+          }
+        }
+      }
+
+      if (v.fitnessExpiry != null) {
+        final days = v.fitnessExpiry!.difference(today).inDays;
+        if (days <= 30) {
+          final id = 'notif_fit_${v.plateNumber}';
+          if (!_dismissedNotificationIds.contains(id)) {
+            list.add(FleetAppNotification(
+              id: id,
+              title: days <= 0 ? 'FITNESS EXPIRED: ${v.plateNumber}' : 'Fitness Certificate Due: ${v.plateNumber}',
+              message: 'Vehicle ${v.plateNumber} (${v.name}) fitness certificate ${days <= 0 ? "EXPIRED on ${v.fitnessExpiry.toString().split(" ")[0]}" : "due for renewal in $days days"}.',
+              date: '2026-07-17',
+              type: days <= 0 ? 'alert' : 'warning',
+            ));
+          }
+        }
+      }
+
+      if (v.fastagBalance < 500) {
+        final id = 'notif_ft_${v.plateNumber}';
+        if (!_dismissedNotificationIds.contains(id)) {
+          list.add(FleetAppNotification(
+            id: id,
+            title: 'Low FASTag Balance: ${v.plateNumber}',
+            message: 'Vehicle ${v.plateNumber} FASTag balance is ₹${v.fastagBalance.toStringAsFixed(0)}. Recharge recommended.',
+            date: '2026-07-17',
+            type: 'warning',
+          ));
+        }
+      }
+    }
+
+    for (final d in _drivers) {
+      if (d.licenseExpiry.isNotEmpty) {
+        try {
+          final licDt = DateTime.parse(d.licenseExpiry);
+          final days = licDt.difference(today).inDays;
+          if (days <= 30) {
+            final id = 'notif_lic_${d.id}';
+            if (!_dismissedNotificationIds.contains(id)) {
+              list.add(FleetAppNotification(
+                id: id,
+                title: days <= 0 ? 'LICENSE EXPIRED: ${d.name}' : 'License Expiry: ${d.name}',
+                message: 'Driver ${d.name} (${d.licenseNumber}) driving license ${days <= 0 ? "EXPIRED on ${d.licenseExpiry}" : "expires in $days days"}.',
+                date: '2026-07-17',
+                type: days <= 0 ? 'alert' : 'warning',
+              ));
+            }
+          }
+        } catch (_) {}
+      }
+      if (d.advance > 10000) {
+        final id = 'notif_adv_${d.id}';
+        if (!_dismissedNotificationIds.contains(id)) {
+          list.add(FleetAppNotification(
+            id: id,
+            title: 'High Driver Advance: ${d.name}',
+            message: 'Driver ${d.name} has an unrecovered advance balance of ₹${d.advance.toStringAsFixed(0)}.',
+            date: '2026-07-17',
+            type: 'info',
+          ));
+        }
+      }
+    }
+
+    return list;
+  }
+
   List<CloudDocument> get uploadedDocuments => _uploadedDocuments;
 
   void addCloudDocument(CloudDocument doc) {

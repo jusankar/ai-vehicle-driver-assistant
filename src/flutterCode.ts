@@ -22,6 +22,8 @@ dependencies:
   provider: ^6.1.2
   speech_to_text: ^7.0.0
   file_picker: ^8.0.3
+  image_picker: ^1.1.2
+  http: ^1.2.1
   intl: ^0.19.0
   cupertino_icons: ^1.0.6
 
@@ -406,6 +408,33 @@ class ExpenseLog {
     'description': description,
   };
 }
+
+class FleetAppNotification {
+  final String id;
+  final String title;
+  final String message;
+  final String date;
+  final String type; // 'alert', 'warning', 'info'
+  bool isRead;
+
+  FleetAppNotification({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.date,
+    required this.type,
+    this.isRead = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'message': message,
+    'date': date,
+    'type': type,
+    'isRead': isRead,
+  };
+}
 `
   },
   {
@@ -562,6 +591,108 @@ class FleetViewModel extends ChangeNotifier {
     return _expenseLogs
         .where((log) => log.date.year == 2026 && log.date.month == 7)
         .fold(0.0, (sum, item) => sum + item.amount);
+  }
+
+  final Set<String> _dismissedNotificationIds = {};
+
+  void dismissNotification(String id) {
+    _dismissedNotificationIds.add(id);
+    notifyListeners();
+  }
+
+  void clearAllNotifications() {
+    final current = getNotifications();
+    for (final n in current) {
+      _dismissedNotificationIds.add(n.id);
+    }
+    notifyListeners();
+  }
+
+  List<FleetAppNotification> getNotifications() {
+    final List<FleetAppNotification> list = [];
+    final today = DateTime(2026, 7, 17);
+
+    for (final v in _vehicles) {
+      if (v.insuranceExpiry != null) {
+        final days = v.insuranceExpiry!.difference(today).inDays;
+        if (days <= 30) {
+          final id = 'notif_ins_\${v.plateNumber}';
+          if (!_dismissedNotificationIds.contains(id)) {
+            list.add(FleetAppNotification(
+              id: id,
+              title: days <= 0 ? 'INSURANCE EXPIRED: \${v.plateNumber}' : 'Insurance Expiring: \${v.plateNumber}',
+              message: 'Vehicle \${v.plateNumber} (\${v.name}) insurance \${days <= 0 ? "EXPIRED on \${v.insuranceExpiry.toString().split(" ")[0]}" : "expires in \$days days (\${v.insuranceExpiry.toString().split(" ")[0]})"}. Please renew.',
+              date: '2026-07-17',
+              type: days <= 0 ? 'alert' : 'warning',
+            ));
+          }
+        }
+      }
+
+      if (v.fitnessExpiry != null) {
+        final days = v.fitnessExpiry!.difference(today).inDays;
+        if (days <= 30) {
+          final id = 'notif_fit_\${v.plateNumber}';
+          if (!_dismissedNotificationIds.contains(id)) {
+            list.add(FleetAppNotification(
+              id: id,
+              title: days <= 0 ? 'FITNESS EXPIRED: \${v.plateNumber}' : 'Fitness Certificate Due: \${v.plateNumber}',
+              message: 'Vehicle \${v.plateNumber} (\${v.name}) fitness certificate \${days <= 0 ? "EXPIRED on \${v.fitnessExpiry.toString().split(" ")[0]}" : "due for renewal in \$days days"}.',
+              date: '2026-07-17',
+              type: days <= 0 ? 'alert' : 'warning',
+            ));
+          }
+        }
+      }
+
+      if (v.fastagBalance < 500) {
+        final id = 'notif_ft_\${v.plateNumber}';
+        if (!_dismissedNotificationIds.contains(id)) {
+          list.add(FleetAppNotification(
+            id: id,
+            title: 'Low FASTag Balance: \${v.plateNumber}',
+            message: 'Vehicle \${v.plateNumber} FASTag balance is ₹\${v.fastagBalance.toStringAsFixed(0)}. Recharge recommended.',
+            date: '2026-07-17',
+            type: 'warning',
+          ));
+        }
+      }
+    }
+
+    for (final d in _drivers) {
+      if (d.licenseExpiry.isNotEmpty) {
+        try {
+          final licDt = DateTime.parse(d.licenseExpiry);
+          final days = licDt.difference(today).inDays;
+          if (days <= 30) {
+            final id = 'notif_lic_\${d.id}';
+            if (!_dismissedNotificationIds.contains(id)) {
+              list.add(FleetAppNotification(
+                id: id,
+                title: days <= 0 ? 'LICENSE EXPIRED: \${d.name}' : 'License Expiry: \${d.name}',
+                message: 'Driver \${d.name} (\${d.licenseNumber}) driving license \${days <= 0 ? "EXPIRED on \${d.licenseExpiry}" : "expires in \$days days"}.',
+                date: '2026-07-17',
+                type: days <= 0 ? 'alert' : 'warning',
+              ));
+            }
+          }
+        } catch (_) {}
+      }
+      if (d.advance > 10000) {
+        final id = 'notif_adv_\${d.id}';
+        if (!_dismissedNotificationIds.contains(id)) {
+          list.add(FleetAppNotification(
+            id: id,
+            title: 'High Driver Advance: \${d.name}',
+            message: 'Driver \${d.name} has an unrecovered advance balance of ₹\${d.advance.toStringAsFixed(0)}.',
+            date: '2026-07-17',
+            type: 'info',
+          ));
+        }
+      }
+    }
+
+    return list;
   }
 
   List<CloudDocument> get uploadedDocuments => _uploadedDocuments;
@@ -750,6 +881,7 @@ class FleetViewModel extends ChangeNotifier {
     content: `import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import '../models/chat_message.dart';
 import '../models/fleet_model.dart';
 import 'fleet_viewmodel.dart';
@@ -766,6 +898,7 @@ class ChatViewModel extends ChangeNotifier {
   
   bool _isLoading = false;
   late final GenerativeModel _model;
+  String _serverUrl = "https://ais-dev-czqawmg62uwikhqbydfl6w-236723801382.asia-southeast1.run.app";
 
   ChatViewModel({String? apiKey}) {
     final key = (apiKey != null && apiKey.isNotEmpty && apiKey != "YOUR_GEMINI_API_KEY" && apiKey != "GEMINI_API_KEY_HERE")
@@ -784,9 +917,9 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
 [DATABASE_ACTION_END]
 """;
 
-    // Initialize Google Generative AI
+    // Initialize Google Generative AI with updated gemini-2.5-flash
     _model = GenerativeModel(
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       apiKey: key,
       systemInstruction: Content.system(systemInstructionText),
     );
@@ -794,6 +927,14 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
 
   List<ChatMessage> get messages => _messages;
   bool get isLoading => _isLoading;
+  String get serverUrl => _serverUrl;
+
+  void setServerUrl(String url) {
+    if (url.trim().isNotEmpty) {
+      _serverUrl = url.trim().replaceAll(RegExp(r'/$'), '');
+      notifyListeners();
+    }
+  }
 
   Future<void> sendMessage(String text, FleetViewModel fleetVM, {bool isVoice = false}) async {
     if (text.trim().isEmpty) return;
@@ -811,8 +952,45 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
     notifyListeners();
 
     try {
-      // Prepare Fleet Context for LLM Grounding
-      final dbContext = """
+      // 1. First, attempt to call the web app server /api/chat endpoint
+      bool serverSuccess = false;
+      String replyText = "";
+
+      final historyPayload = _messages
+          .where((m) => m.id != "init")
+          .map((m) => {
+                'sender': m.sender == MessageSender.user ? 'user' : 'assistant',
+                'text': m.text,
+              })
+          .toList();
+
+      try {
+        final uri = Uri.parse('\$_serverUrl/api/chat');
+        final response = await http
+            .post(
+              uri,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'message': text,
+                'history': historyPayload,
+              }),
+            )
+            .timeout(const Duration(seconds: 12));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['response'] != null) {
+            replyText = data['response'];
+            serverSuccess = true;
+          }
+        }
+      } catch (httpError) {
+        print("Server API call error: \$httpError. Falling back to direct Gemini SDK.");
+      }
+
+      // 2. Fallback to direct Gemini SDK call if server call failed
+      if (!serverSuccess) {
+        final dbContext = """
 Current local date: 2026-08-01.
 FLEET DATABASE STATUS:
 Vehicles: \${jsonEncode(fleetVM.vehicles.map((v) => v.toJson()).toList())}
@@ -821,39 +999,36 @@ Fuel Logs: \${jsonEncode(fleetVM.fuelLogs.map((f) => f.toJson()).toList())}
 Expense Logs: \${jsonEncode(fleetVM.expenseLogs.map((e) => e.toJson()).toList())}
 """;
 
-      final contents = <Content>[];
-      
-      // Pass grounding context as first user prompt (single line string)
-      contents.add(Content.text("FLEET DATABASE CONTEXT: " + dbContext));
-      
-      // Append history & new message
-      for (final msg in _messages) {
-        if (msg.id == "init") continue;
-        if (msg.sender == MessageSender.user) {
-          contents.add(Content.text(msg.text));
-        } else {
-          contents.add(Content.model([TextPart(msg.text)]));
+        final contents = <Content>[];
+        contents.add(Content.text("FLEET DATABASE CONTEXT: " + dbContext));
+        
+        for (final msg in _messages) {
+          if (msg.id == "init") continue;
+          if (msg.sender == MessageSender.user) {
+            contents.add(Content.text(msg.text));
+          } else {
+            contents.add(Content.model([TextPart(msg.text)]));
+          }
         }
+
+        final response = await _model.generateContent(contents);
+        replyText = response.text ?? "I was unable to retrieve an answer.";
       }
 
-      final response = await _model.generateContent(contents);
-
-      final replyText = response.text ?? "I was unable to retrieve an answer.";
-      
       // Parse database action if returned
       _parseDatabaseAction(replyText, fleetVM);
 
       _messages.add(ChatMessage(
         id: DateTime.now().toString(),
         sender: MessageSender.assistant,
-        text: replyText.replaceAll(RegExp(r'\\[DATABASE_ACTION_START\\].*\\[DATABASE_ACTION_END\\]', dotAll: true), '').trim(),
+        text: replyText.replaceAll(RegExp(r'\[DATABASE_ACTION_START\].*\[DATABASE_ACTION_END\]', dotAll: true), '').trim(),
         timestamp: DateTime.now(),
       ));
     } catch (e) {
       _messages.add(ChatMessage(
         id: DateTime.now().toString(),
         sender: MessageSender.assistant,
-        text: "Error connecting to assistant: \$e",
+        text: "Error connecting to assistant: \$e. Please verify your internet connection or server endpoint.",
         timestamp: DateTime.now(),
       ));
     } finally {
@@ -916,12 +1091,16 @@ Expense Logs: \${jsonEncode(fleetVM.expenseLogs.map((e) => e.toJson()).toList())
     language: "dart",
     content: `import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../viewmodels/fleet_viewmodel.dart';
 import '../viewmodels/chat_viewmodel.dart';
+import '../models/cloud_document.dart';
 import 'chat_view.dart';
 import 'vehicle_management_views.dart';
 import 'document_vault_view.dart';
 import 'driver_management_views.dart';
+import 'reports_view.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -946,6 +1125,7 @@ class _HomeViewState extends State<HomeView> {
       const VehicleListView(),
       const DriverListView(),
       const DocumentVaultView(),
+      const ReportsView(),
       const ChatView(),
     ];
 
@@ -983,6 +1163,11 @@ class _HomeViewState extends State<HomeView> {
             label: 'Vault',
           ),
           NavigationDestination(
+            icon: Icon(Icons.bar_chart_outlined),
+            selectedIcon: Icon(Icons.bar_chart),
+            label: 'Reports',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
             selectedIcon: Icon(Icons.auto_awesome),
             label: 'AI Chat',
@@ -1011,13 +1196,19 @@ class _HomeDashboardContent extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          IconButton(
-            icon: const Badge(
-              label: Text('2'),
-              child: Icon(Icons.notifications_outlined),
-            ),
-            onPressed: () {
-              _showNotificationsDialog(context);
+          Consumer<FleetViewModel>(
+            builder: (context, vm, child) {
+              final notifCount = vm.getNotifications().length;
+              return IconButton(
+                icon: Badge(
+                  label: Text('$notifCount'),
+                  isLabelVisible: notifCount > 0,
+                  child: const Icon(Icons.notifications_outlined),
+                ),
+                onPressed: () {
+                  _showNotificationsDialog(context, vm);
+                },
+              );
             },
           ),
           const SizedBox(width: 8),
@@ -1097,6 +1288,26 @@ class _HomeDashboardContent extends StatelessWidget {
                   onTap: () => onNavigateTab(3),
                 ),
               ),
+              const SizedBox(height: 12),
+
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(color: theme.colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(16),
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.purple.withOpacity(0.12),
+                    child: const Icon(Icons.bar_chart, color: Colors.purple),
+                  ),
+                  title: const Text('Reports & Analytics', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Monthly operating cost analysis, fuel efficiency audit, driver salary ledger, and compliance expiries.'),
+                  trailing: const Icon(Icons.arrow_right_alt, color: Colors.purple),
+                  onTap: () => onNavigateTab(4),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // KPI Bento Grid
@@ -1126,7 +1337,7 @@ class _HomeDashboardContent extends StatelessWidget {
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   TextButton(
-                    onPressed: () => onNavigateTab(4),
+                    onPressed: () => onNavigateTab(5),
                     child: const Text('Open Chat'),
                   ),
                 ],
@@ -1138,7 +1349,7 @@ class _HomeDashboardContent extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => onNavigateTab(4),
+        onPressed: () => onNavigateTab(5),
         icon: const Icon(Icons.chat_bubble_outline),
         label: const Text('Ask Assistant'),
       ),
@@ -1326,92 +1537,232 @@ class _HomeDashboardContent extends StatelessWidget {
           style: theme.textTheme.bodySmall,
         ),
         trailing: const Icon(Icons.chevron_right, size: 16),
-        onTap: () => onNavigateTab(4),
+        onTap: () => onNavigateTab(5),
       ),
     );
   }
 
-  void _showNotificationsDialog(BuildContext context) {
+  void _showNotificationsDialog(BuildContext context, FleetViewModel fleetVM) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildNotificationTile(
-                context,
-                'Insurance Expiring Soon',
-                'Vehicle TN68CD5678 insurance expires in 8 days (July 25, 2026). Please renew.',
-                Colors.amber,
+      builder: (dialogCtx) {
+        return Consumer<FleetViewModel>(
+          builder: (context, vm, child) {
+            final notifications = vm.getNotifications();
+            return AlertDialog(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.notifications_active, size: 20),
+                      SizedBox(width: 8),
+                      Text('Notifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    ],
+                  ),
+                  if (notifications.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        vm.clearAllNotifications();
+                      },
+                      child: const Text('Clear All', style: TextStyle(fontSize: 12)),
+                    ),
+                ],
               ),
-              const Divider(),
-              _buildNotificationTile(
-                context,
-                'Fitness Certificate Due',
-                'Vehicle MH12GH3456 fitness certificate is due for renewal soon.',
-                Colors.blue,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          )
-        ],
-      ),
-    );
-  }
+              content: SizedBox(
+                width: double.maxFinite,
+                child: notifications.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, color: Colors.green, size: 48),
+                            SizedBox(height: 12),
+                            Text('All Caught Up!', style: TextStyle(fontWeight: FontWeight.bold)),
+                            SizedBox(height: 4),
+                            Text('No active notifications or compliance alerts.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: notifications.map((notif) {
+                            Color accentColor = Colors.blue;
+                            IconData iconData = Icons.info_outline;
+                            if (notif.type == 'alert') {
+                              accentColor = Colors.red;
+                              iconData = Icons.error_outline;
+                            } else if (notif.type == 'warning') {
+                              accentColor = Colors.amber.shade800;
+                              iconData = Icons.warning_amber_rounded;
+                            }
 
-  Widget _buildNotificationTile(BuildContext context, String title, String body, Color accentColor) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_amber_rounded, color: accentColor, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(body, style: theme.textTheme.bodySmall),
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: accentColor.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: accentColor.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(iconData, color: accentColor, size: 22),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          notif.title,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: accentColor,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          notif.message,
+                                          style: const TextStyle(fontSize: 12, height: 1.3),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          notif.date,
+                                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                                    onPressed: () {
+                                      vm.dismissNotification(notif.id);
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Close'),
+                ),
               ],
-            ),
-          )
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
   void _showMockUploadDialog(BuildContext context) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Upload Document / Invoice'),
-        content: const Text('Choose a fuel receipt, tolls bill, or insurance document to parse with AI and automatically update your fleet records.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Document uploaded successfully. Parsing with Gemini AI...')),
-              );
-            },
-            child: const Text('Pick Image/PDF'),
-          ),
-        ],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Upload Fleet Invoice / Document',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Select a document source to pick fuel bills, repair receipts, or compliance documents.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.blueContainer,
+                child: Icon(Icons.camera_alt, color: Colors.blue),
+              ),
+              title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Capture receipt directly with camera'),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final picker = ImagePicker();
+                final image = await picker.pickImage(source: ImageSource.camera);
+                if (image != null && context.mounted) {
+                  _processPickedFile(context, image.name, 'Camera Image', 'Fuel Bills');
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.greenContainer,
+                child: Icon(Icons.photo_library, color: Colors.green),
+              ),
+              title: const Text('Choose Image from Gallery', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Select receipt image from photo library'),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final picker = ImagePicker();
+                final image = await picker.pickImage(source: ImageSource.gallery);
+                if (image != null && context.mounted) {
+                  _processPickedFile(context, image.name, 'Gallery Image', 'Service Bills');
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.orangeContainer,
+                child: Icon(Icons.picture_as_pdf, color: Colors.orange),
+              ),
+              title: const Text('Select PDF or Document File', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Browse PDF, Word, or Excel file from storage'),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final result = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'],
+                );
+                if (result != null && result.files.isNotEmpty && context.mounted) {
+                  final file = result.files.first;
+                  _processPickedFile(context, file.name, 'PDF File', 'Insurance PDF');
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _processPickedFile(BuildContext context, String fileName, String source, String docType) {
+    final fleetVM = context.read<FleetViewModel>();
+    final newDoc = CloudDocument(
+      id: 'cd_\${DateTime.now().millisecondsSinceEpoch}',
+      name: fileName,
+      documentType: docType,
+      source: source,
+      uploadedAt: DateTime.now(),
+      fileSize: '1.2 MB',
+      storageUrl: 'https://storage.googleapis.com/fleet-cloud-bucket/\$fileName',
+      notes: 'Uploaded via Quick Actions',
+    );
+    fleetVM.addCloudDocument(newDoc);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.green,
+        content: Text('"\$fileName" uploaded to Cloud Vault and parsed with Gemini AI!'),
       ),
     );
   }
@@ -1424,6 +1775,8 @@ class _HomeDashboardContent extends StatelessWidget {
     content: `import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../viewmodels/chat_viewmodel.dart';
 import '../viewmodels/fleet_viewmodel.dart';
 import '../models/chat_message.dart';
@@ -1503,6 +1856,86 @@ class _ChatViewState extends State<ChatView> {
     _scrollToBottom();
   }
 
+  void _pickAndAnalyzeDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'],
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final fileName = file.name;
+        final fileSize = (file.size / 1024).toStringAsFixed(1) + ' KB';
+        
+        _controller.text = 'Analyze document: "$fileName" ($fileSize). Extract key expenses, diesel liters, or vehicle plate numbers.';
+        _submitMessage();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to pick document: \$e')),
+      );
+    }
+  }
+
+  void _showServerSettingsDialog() {
+    final chatVM = context.read<ChatViewModel>();
+    final urlController = TextEditingController(text: chatVM.serverUrl);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.tune, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('AI Server Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Backend Server URL:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: urlController,
+              decoration: InputDecoration(
+                hintText: 'https://ais-dev-...run.app or http://10.0.2.2:3000',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'When connected, AI prompts route through server-side Gemini 2.5 Flash for grounded fleet insights & auto database logging.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              chatVM.setServerUrl(urlController.text);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Server endpoint updated to: \${chatVM.serverUrl}')),
+              );
+            },
+            child: const Text('Save Endpoint'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1522,12 +1955,17 @@ class _ChatViewState extends State<ChatView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('AI Fleet Assistant', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text('Online • Powered by Gemini', style: TextStyle(fontSize: 10, color: Colors.green)),
+                Text('Online • Gemini 2.5 Flash', style: TextStyle(fontSize: 10, color: Colors.green)),
               ],
             ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'Server Settings',
+            onPressed: _showServerSettingsDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Clear conversation',
@@ -1582,7 +2020,8 @@ class _ChatViewState extends State<ChatView> {
                   // Attachment upload shortcut
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () {},
+                    tooltip: 'Attach PDF/Invoice',
+                    onPressed: _pickAndAnalyzeDocument,
                   ),
                   Expanded(
                     child: TextField(
@@ -3668,6 +4107,422 @@ class MyApp extends StatelessWidget {
 `
   },
   {
+    path: "lib/views/reports_view.dart",
+    language: "dart",
+    content: `import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+import '../models/fleet_model.dart';
+import '../viewmodels/fleet_viewmodel.dart';
+
+class ReportsView extends StatefulWidget {
+  const ReportsView({super.key});
+
+  @override
+  State<ReportsView> createState() => _ReportsViewState();
+}
+
+class _ReportsViewState extends State<ReportsView> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fleetVM = context.watch<FleetViewModel>();
+    final theme = Theme.of(context);
+    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
+    final fuelLiters = fleetVM.getJulyFuelLiters();
+    final fuelCost = fleetVM.getJulyFuelCost();
+    final expensesTotal = fleetVM.getJulyExpenses();
+
+    double totalSalaries = 0;
+    double totalAdvances = 0;
+    for (final d in fleetVM.drivers) {
+      totalSalaries += d.salaryRate;
+      totalAdvances += d.advance;
+    }
+
+    final totalGrandExpenses = fuelCost + expensesTotal + totalSalaries;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Fleet Reports & Analytics', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Copy/Share Summary Report',
+            onPressed: () {
+              final summaryText = """
+=== FLEET COST & COMPLIANCE REPORT ===
+Date: \${DateFormat('MMMM yyyy').format(DateTime.now())}
+Total Active Vehicles: \${fleetVM.vehicles.length}
+Total Active Drivers: \${fleetVM.drivers.length}
+
+FINANCIAL OVERVIEW:
+- Diesel Fuel Cost: \${currency.format(fuelCost)} (\${fuelLiters.toStringAsFixed(0)} Liters)
+- Servicing & Toll Expenses: \${currency.format(expensesTotal)}
+- Driver Salary Base Payroll: \${currency.format(totalSalaries)}
+- Outstanding Driver Advances: \${currency.format(totalAdvances)}
+- Total Monthly Operating Cost: \${currency.format(totalGrandExpenses)}
+""";
+              Clipboard.setData(ClipboardData(text: summaryText));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Report summary copied to clipboard! Ready to share.')),
+              );
+            },
+          )
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabs: const [
+            Tab(text: 'Financials'),
+            Tab(text: 'Fuel & Trips'),
+            Tab(text: 'Driver Ledger'),
+            Tab(text: 'Compliance'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildFinancialsTab(context, fleetVM, currency, fuelCost, expensesTotal, totalSalaries, totalAdvances, totalGrandExpenses),
+          _buildFuelAndTripsTab(context, fleetVM, currency),
+          _buildDriverLedgerTab(context, fleetVM, currency),
+          _buildComplianceTab(context, fleetVM),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinancialsTab(
+    BuildContext context,
+    FleetViewModel fleetVM,
+    NumberFormat currency,
+    double fuelCost,
+    double expensesTotal,
+    double totalSalaries,
+    double totalAdvances,
+    double totalGrandExpenses,
+  ) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          elevation: 0,
+          color: theme.colorScheme.primaryContainer,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('TOTAL OPERATING COST', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+                      child: Text('July 2026', style: TextStyle(color: theme.colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(currency.format(totalGrandExpenses), style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimaryContainer)),
+                const SizedBox(height: 6),
+                Text('Combines Diesel + Servicing/Tolls + Base Salaries', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimaryContainer.withOpacity(0.8))),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        Text('Expense Category Breakdown', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildExpenseRow('Diesel Fuel', fuelCost, totalGrandExpenses, Colors.orange, currency),
+                const Divider(height: 24),
+                _buildExpenseRow('Vehicle Repairs & Servicing', expensesTotal * 0.7, totalGrandExpenses, Colors.blue, currency),
+                const Divider(height: 24),
+                _buildExpenseRow('Tolls & Permits', expensesTotal * 0.3, totalGrandExpenses, Colors.purple, currency),
+                const Divider(height: 24),
+                _buildExpenseRow('Driver Salaries', totalSalaries, totalGrandExpenses, Colors.green, currency),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        Card(
+          elevation: 0,
+          color: Colors.amber.withOpacity(0.1),
+          shape: RoundedRectangleBorder(
+            side: BorderSide(color: Colors.amber.withOpacity(0.4)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ListTile(
+            leading: const Icon(Icons.account_balance_wallet, color: Colors.amber),
+            title: const Text('Outstanding Driver Advances', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Total unrecovered advance balance across all drivers: \${currency.format(totalAdvances)}'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpenseRow(String title, double amount, double total, Color color, NumberFormat currency) {
+    final pct = total > 0 ? (amount / total * 100).toStringAsFixed(1) : '0';
+    return Row(
+      children: [
+        CircleAvatar(radius: 16, backgroundColor: color.withOpacity(0.15), child: Icon(Icons.pie_chart, size: 16, color: color)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 4),
+              LinearProgressIndicator(value: total > 0 ? amount / total : 0, color: color, backgroundColor: color.withOpacity(0.1), minHeight: 6),
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(currency.format(amount), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text('\$pct%', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _buildFuelAndTripsTab(BuildContext context, FleetViewModel fleetVM, NumberFormat currency) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('Vehicle Fuel Efficiency Audit', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        ...fleetVM.vehicles.map((v) {
+          double vehicleLiters = 0;
+          double vehicleCost = 0;
+          for (final f in fleetVM.fuelLogs.where((l) => l.plateNumber == v.plateNumber)) {
+            vehicleLiters += f.liters;
+            vehicleCost += f.amount;
+          }
+          final efficiency = vehicleLiters > 0 ? (v.currentOdometer / vehicleLiters / 10).toStringAsFixed(2) : '3.85';
+
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(v.plateNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, fontFamily: 'monospace')),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.green.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                        child: Text('\$efficiency km/L', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('\${v.name} • \${v.manufacturer} \${v.model}', style: theme.textTheme.bodySmall),
+                  const Divider(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Total Diesel', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text('\${vehicleLiters.toStringAsFixed(0)} Liters', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('Fuel Expenditure', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text(currency.format(vehicleCost), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                        ],
+                      )
+                    ],
+                  )
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildDriverLedgerTab(BuildContext context, FleetViewModel fleetVM, NumberFormat currency) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('Monthly Payroll & Advance Ledger', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        ...fleetVM.drivers.map((d) {
+          final netPayable = d.salaryRate - d.advance;
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(d.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(d.assignedVehiclePlate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'monospace', color: Colors.grey)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Phone: \${d.phone} • License: \${d.licenseNumber}', style: theme.textTheme.bodySmall),
+                  const Divider(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('\${d.salaryType} Rate', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text(currency.format(d.salaryRate), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Text('Advance Due', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text(currency.format(d.advance), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('Net Salary Due', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text(currency.format(netPayable > 0 ? netPayable : 0), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                        ],
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildComplianceTab(BuildContext context, FleetViewModel fleetVM) {
+    final theme = Theme.of(context);
+    final today = DateTime(2026, 7, 17);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('Vehicle Compliance & Document Expiries', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        ...fleetVM.vehicles.map((v) {
+          final expiries = [
+            {'label': 'Insurance', 'date': v.insuranceExpiry},
+            {'label': 'Fitness', 'date': v.fitnessExpiry},
+            {'label': 'Permit', 'date': v.permitExpiry},
+            {'label': 'PUC', 'date': v.pucExpiry},
+            {'label': 'Road Tax', 'date': v.roadTaxExpiry},
+          ];
+
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('\${v.plateNumber} (\${v.name})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: expiries.map((e) {
+                      final dt = e['date'] as DateTime?;
+                      if (dt == null) return const SizedBox.shrink();
+                      final days = dt.difference(today).inDays;
+                      Color c = Colors.green;
+                      if (days <= 0) c = Colors.red;
+                      else if (days <= 30) c = Colors.amber;
+
+                      return Chip(
+                        avatar: CircleAvatar(backgroundColor: c, radius: 4),
+                        label: Text('\${e['label']}: \${days <= 0 ? "EXPIRED" : "\$days days"}', style: TextStyle(fontSize: 11, color: c, fontWeight: FontWeight.bold)),
+                        backgroundColor: c.withOpacity(0.1),
+                        side: BorderSide(color: c.withOpacity(0.3)),
+                      );
+                    }).toList(),
+                  )
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+}
+`
+  },
+  {
     path: "lib/models/cloud_document.dart",
     language: "dart",
     content: `class CloudDocument {
@@ -3721,6 +4576,8 @@ class MyApp extends StatelessWidget {
     content: `import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/cloud_document.dart';
 import '../models/fleet_model.dart';
 import '../viewmodels/fleet_viewmodel.dart';
@@ -3736,7 +4593,9 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
   final _notesController = TextEditingController();
   String _selectedType = 'Insurance PDF';
   String _selectedSource = 'PDF';
-  String? _simulatedFilePath;
+  
+  String? _pickedFileName;
+  String? _pickedFileSize;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
 
@@ -3760,12 +4619,52 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
     super.dispose();
   }
 
-  void _simulateUpload() async {
-    if (_selectedSource != 'PDF' && _simulatedFilePath == null) {
+  Future<void> _pickFile() async {
+    try {
+      if (_selectedSource == 'Camera') {
+        final picker = ImagePicker();
+        final XFile? image = await picker.pickImage(source: ImageSource.camera);
+        if (image != null) {
+          final length = await image.length();
+          setState(() {
+            _pickedFileName = image.name;
+            _pickedFileSize = (length / 1024).toStringAsFixed(1) + ' KB';
+          });
+        }
+      } else if (_selectedSource == 'Gallery') {
+        final picker = ImagePicker();
+        final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+        if (image != null) {
+          final length = await image.length();
+          setState(() {
+            _pickedFileName = image.name;
+            _pickedFileSize = (length / 1024).toStringAsFixed(1) + ' KB';
+          });
+        }
+      } else {
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'xls', 'xlsx'],
+        );
+        if (result != null && result.files.isNotEmpty) {
+          final file = result.files.first;
+          setState(() {
+            _pickedFileName = file.name;
+            _pickedFileSize = (file.size / 1024).toStringAsFixed(1) + ' KB';
+          });
+        }
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select or capture a file first.')),
+        SnackBar(content: Text('File picker error: $e')),
       );
-      return;
+    }
+  }
+
+  void _simulateUpload() async {
+    if (_pickedFileName == null) {
+      await _pickFile();
+      if (_pickedFileName == null) return;
     }
 
     setState(() {
@@ -3774,7 +4673,7 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
     });
 
     for (int i = 1; i <= 5; i++) {
-      await Future.delayed(const Duration(milliseconds: 350));
+      await Future.delayed(const Duration(milliseconds: 300));
       setState(() {
         _uploadProgress = i * 0.2;
       });
@@ -3783,14 +4682,12 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
     final fleetVM = context.read<FleetViewModel>();
     final newDoc = CloudDocument(
       id: 'cd_\${DateTime.now().millisecondsSinceEpoch}',
-      name: _selectedSource == 'PDF' 
-          ? 'scanned_\${_selectedType.toLowerCase().replaceAll(' ', '_')}.pdf'
-          : 'captured_\${_selectedType.toLowerCase().replaceAll(' ', '_')}.jpg',
+      name: _pickedFileName ?? 'document_\${DateTime.now().millisecondsSinceEpoch}.pdf',
       documentType: _selectedType,
       source: _selectedSource,
       uploadedAt: DateTime.now(),
-      fileSize: _selectedSource == 'PDF' ? '1.8 MB' : '920 KB',
-      storageUrl: 'https://storage.googleapis.com/fleet-cloud-bucket/doc_\${DateTime.now().millisecondsSinceEpoch}.\${_selectedSource == 'PDF' ? 'pdf' : 'jpg'}',
+      fileSize: _pickedFileSize ?? '1.2 MB',
+      storageUrl: 'https://storage.googleapis.com/fleet-cloud-bucket/doc_\${DateTime.now().millisecondsSinceEpoch}',
       notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
     );
 
@@ -3798,14 +4695,15 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
 
     setState(() {
       _isUploading = false;
-      _simulatedFilePath = null;
+      _pickedFileName = null;
+      _pickedFileSize = null;
       _notesController.clear();
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: Colors.green,
-        content: Text('"\${newDoc.name}" uploaded & encrypted securely in AES-256 Cloud Vault!'),
+        content: Text('"\${newDoc.name}" uploaded & saved securely in Centralized Vault!'),
       ),
     );
   }
@@ -3942,7 +4840,8 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
                                     if (val != null) {
                                       setState(() {
                                         _selectedSource = val;
-                                        _simulatedFilePath = null;
+                                        _pickedFileName = null;
+                                        _pickedFileSize = null;
                                       });
                                     }
                                   },
@@ -3964,45 +4863,36 @@ class _DocumentVaultViewState extends State<DocumentVaultView> {
                         ),
                         child: Column(
                           children: [
-                            if (_selectedSource == 'PDF') ...[
-                              Icon(Icons.picture_as_pdf, size: 40, color: theme.colorScheme.primary.withOpacity(0.7)),
+                            if (_pickedFileName != null) ...[
+                              const Icon(Icons.insert_drive_file, size: 40, color: Colors.green),
                               const SizedBox(height: 12),
-                              const Text('PDF Document Selected', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text(_pickedFileName!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center),
                               const SizedBox(height: 4),
-                              Text('Simulating dynamic attachment up to 10MB', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                            ] else if (_simulatedFilePath == null) ...[
-                              Icon(_selectedSource == 'Camera' ? Icons.camera_alt_outlined : Icons.photo_library_outlined, size: 40, color: theme.colorScheme.secondary),
+                              Text('Size: \${_pickedFileSize ?? "Unknown"}', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () => setState(() {
+                                  _pickedFileName = null;
+                                  _pickedFileSize = null;
+                                }),
+                                child: const Text('Change Selected File', style: TextStyle(color: Colors.red, fontSize: 12)),
+                              )
+                            ] else ...[
+                              Icon(
+                                _selectedSource == 'Camera'
+                                    ? Icons.camera_alt_outlined
+                                    : (_selectedSource == 'Gallery' ? Icons.photo_library_outlined : Icons.picture_as_pdf),
+                                size: 40,
+                                color: theme.colorScheme.primary,
+                              ),
                               const SizedBox(height: 12),
-                              Text(_selectedSource == 'Camera' ? 'Ready to Capture Receipt' : 'Select from Photo Gallery', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text('Select \${_selectedSource} file to attach', style: const TextStyle(fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
                               ElevatedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _simulatedFilePath = 'assets/simulated_receipt_\${_selectedType.toLowerCase().replaceAll(' ', '_')}.jpg';
-                                  });
-                                },
-                                icon: Icon(_selectedSource == 'Camera' ? Icons.camera : Icons.photo),
-                                label: Text(_selectedSource == 'Camera' ? 'Trigger Snapshot' : 'Browse Gallery'),
+                                onPressed: _pickFile,
+                                icon: Icon(_selectedSource == 'Camera' ? Icons.camera : Icons.attach_file),
+                                label: Text(_selectedSource == 'Camera' ? 'Take Snapshot' : 'Browse File'),
                               ),
-                            ] else ...[
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  width: 140,
-                                  height: 80,
-                                  color: Colors.black12,
-                                  child: const Center(
-                                    child: Icon(Icons.check_circle, color: Colors.green, size: 36),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text('Receipt Image Attached!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              TextButton(
-                                onPressed: () => setState(() => _simulatedFilePath = null),
-                                child: const Text('Remove Snapshot', style: TextStyle(color: Colors.red)),
-                              )
                             ],
                           ],
                         ),

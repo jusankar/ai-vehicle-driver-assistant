@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../viewmodels/chat_viewmodel.dart';
 import '../viewmodels/fleet_viewmodel.dart';
 import '../models/chat_message.dart';
@@ -80,6 +82,86 @@ class _ChatViewState extends State<ChatView> {
     _scrollToBottom();
   }
 
+  void _pickAndAnalyzeDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'],
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final fileName = file.name;
+        final fileSize = (file.size / 1024).toStringAsFixed(1) + ' KB';
+        
+        _controller.text = 'Analyze document: "$fileName" ($fileSize). Extract key expenses, diesel liters, or vehicle plate numbers.';
+        _submitMessage();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to pick document: $e')),
+      );
+    }
+  }
+
+  void _showServerSettingsDialog() {
+    final chatVM = context.read<ChatViewModel>();
+    final urlController = TextEditingController(text: chatVM.serverUrl);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.tune, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('AI Server Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Backend Server URL:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: urlController,
+              decoration: InputDecoration(
+                hintText: 'https://ais-dev-...run.app or http://10.0.2.2:3000',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'When connected, AI prompts route through server-side Gemini 2.5 Flash for grounded fleet insights & auto database logging.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              chatVM.setServerUrl(urlController.text);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Server endpoint updated to: ${chatVM.serverUrl}')),
+              );
+            },
+            child: const Text('Save Endpoint'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -99,12 +181,17 @@ class _ChatViewState extends State<ChatView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('AI Fleet Assistant', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text('Online • Powered by Gemini', style: TextStyle(fontSize: 10, color: Colors.green)),
+                Text('Online • Gemini 2.5 Flash', style: TextStyle(fontSize: 10, color: Colors.green)),
               ],
             ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'Server Settings',
+            onPressed: _showServerSettingsDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Clear conversation',
@@ -159,7 +246,8 @@ class _ChatViewState extends State<ChatView> {
                   // Attachment upload shortcut
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () {},
+                    tooltip: 'Attach PDF/Invoice',
+                    onPressed: _pickAndAnalyzeDocument,
                   ),
                   Expanded(
                     child: TextField(

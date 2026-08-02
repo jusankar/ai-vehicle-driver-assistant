@@ -362,12 +362,115 @@ async function runSchedulerCheck(): Promise<{ triggeredCount: number; alerts: st
       }
     }
 
+    // Dynamic compliance audit for vehicles & drivers
+    const existingNotifications = await db.select().from(notifications);
+    const existingIds = new Set(existingNotifications.map(n => n.id));
+
+    for (const v of allVehicles) {
+      if (v.insuranceExpiry) {
+        const dueDate = new Date(v.insuranceExpiry);
+        const days = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (days <= 30) {
+          const id = `notif_ins_${v.plateNumber}`;
+          if (!existingIds.has(id)) {
+            await db.insert(notifications).values({
+              id,
+              title: days <= 0 ? `INSURANCE EXPIRED: ${v.plateNumber}` : `Insurance Expiring: ${v.plateNumber}`,
+              message: `Vehicle ${v.plateNumber} (${v.name}) insurance ${days <= 0 ? `EXPIRED on ${v.insuranceExpiry}` : `expires in ${days} days (${v.insuranceExpiry})`}. Please renew immediately.`,
+              date: todayStr,
+              type: days <= 0 ? "alert" : "warning",
+              read: false
+            });
+            existingIds.add(id);
+          }
+        }
+      }
+
+      if (v.fitnessExpiry) {
+        const dueDate = new Date(v.fitnessExpiry);
+        const days = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (days <= 30) {
+          const id = `notif_fit_${v.plateNumber}`;
+          if (!existingIds.has(id)) {
+            await db.insert(notifications).values({
+              id,
+              title: days <= 0 ? `FITNESS CERTIFICATE EXPIRED: ${v.plateNumber}` : `Fitness Renewal: ${v.plateNumber}`,
+              message: `Vehicle ${v.plateNumber} (${v.name}) fitness certificate ${days <= 0 ? `EXPIRED on ${v.fitnessExpiry}` : `is due for renewal in ${days} days`}.`,
+              date: todayStr,
+              type: days <= 0 ? "alert" : "warning",
+              read: false
+            });
+            existingIds.add(id);
+          }
+        }
+      }
+
+      if (v.fastagBalance && Number(v.fastagBalance) < 500) {
+        const id = `notif_ft_${v.plateNumber}`;
+        if (!existingIds.has(id)) {
+          await db.insert(notifications).values({
+            id,
+            title: `Low FASTag Balance: ${v.plateNumber}`,
+            message: `FASTag balance for ${v.plateNumber} is ₹${v.fastagBalance}. Recharge recommended (min ₹500).`,
+            date: todayStr,
+            type: "warning",
+            read: false
+          });
+          existingIds.add(id);
+        }
+      }
+    }
+
+    const allDriversList = await db.select().from(drivers);
+    for (const d of allDriversList) {
+      if (d.licenseExpiry) {
+        const dueDate = new Date(d.licenseExpiry);
+        const days = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (days <= 30) {
+          const id = `notif_lic_${d.id}`;
+          if (!existingIds.has(id)) {
+            await db.insert(notifications).values({
+              id,
+              title: days <= 0 ? `LICENSE EXPIRED: ${d.name}` : `License Expiry: ${d.name}`,
+              message: `Driver ${d.name} (${d.licenseNumber}) driving license ${days <= 0 ? `EXPIRED on ${d.licenseExpiry}` : `expires in ${days} days`}.`,
+              date: todayStr,
+              type: days <= 0 ? "alert" : "warning",
+              read: false
+            });
+            existingIds.add(id);
+          }
+        }
+      }
+    }
+
     return { triggeredCount, alerts };
   } catch (err) {
     console.error("Error in scheduler check execution:", err);
     return { triggeredCount: 0, alerts: [] };
   }
 }
+
+// Clear all notifications endpoint
+app.post("/api/notifications/clear", async (req, res) => {
+  try {
+    await db.delete(notifications);
+    const state = await getFullFleetState();
+    res.json({ status: "success", database: state });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to clear notifications" });
+  }
+});
+
+// Dismiss single notification endpoint
+app.delete("/api/notifications/:id", async (req, res) => {
+  try {
+    await db.delete(notifications).where(eq(notifications.id, req.params.id));
+    const state = await getFullFleetState();
+    res.json({ status: "success", database: state });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to dismiss notification" });
+  }
+});
 
 // 1. GET current fleet state (triggers dynamic reminder evaluation)
 app.get("/api/fleet", async (req, res) => {

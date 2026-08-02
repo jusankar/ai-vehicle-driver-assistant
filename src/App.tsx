@@ -483,6 +483,31 @@ export default function App() {
     }
   };
 
+  const handleClearNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications/clear", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setFleet(data.database);
+        triggerToast("Notifications cleared!");
+      }
+    } catch (err) {
+      console.error("Failed to clear notifications", err);
+    }
+  };
+
+  const handleDismissNotification = async (id: string) => {
+    try {
+      const res = await fetch(`/api/notifications/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        const data = await res.json();
+        setFleet(data.database);
+      }
+    } catch (err) {
+      console.error("Failed to dismiss notification", err);
+    }
+  };
+
   const handleRunScheduler = async () => {
     setIsRunningScheduler(true);
     try {
@@ -1241,23 +1266,42 @@ export default function App() {
 
               {/* Notification Drawer (Overlay modal inside Phone) */}
               {showNotifications && (
-                <div className="absolute inset-x-0 top-[53px] bg-[#F3EDF7]/95 backdrop-blur-md border-b border-[#CAC4D0] p-4 z-40 shadow-xl max-h-64 overflow-y-auto">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-[#49454F] tracking-wider">NOTIFICATIONS</span>
-                    <button onClick={() => setShowNotifications(false)} className="text-[#49454F] hover:text-[#1C1B1F] p-1">
-                      <X className="w-4 h-4" />
-                    </button>
+                <div className="absolute inset-x-0 top-[53px] bg-[#F3EDF7]/95 backdrop-blur-md border-b border-[#CAC4D0] p-4 z-40 shadow-xl max-h-72 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-2 pb-1 border-b border-[#CAC4D0]/60">
+                    <span className="text-xs font-bold text-[#49454F] tracking-wider">SYSTEM NOTIFICATIONS</span>
+                    <div className="flex items-center gap-2">
+                      {fleet && fleet.notifications.length > 0 && (
+                        <button 
+                          onClick={handleClearNotifications}
+                          className="text-[10px] font-semibold text-[#6750A4] hover:underline"
+                        >
+                          Clear All
+                        </button>
+                      )}
+                      <button onClick={() => setShowNotifications(false)} className="text-[#49454F] hover:text-[#1C1B1F] p-0.5">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   {fleet && fleet.notifications.length > 0 ? (
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       {fleet.notifications.map((notif) => (
-                        <div key={notif.id} className="bg-[#F7F2FA] p-2.5 rounded-lg border border-[#CAC4D0] flex gap-2">
-                          <AlertCircle className={`w-4 h-4 mt-0.5 shrink-0 ${notif.type === 'warning' ? 'text-[#B3261E]' : 'text-[#6750A4]'}`} />
-                          <div>
-                            <p className="text-xs font-semibold text-[#1C1B1F] leading-tight">{notif.title}</p>
-                            <p className="text-[11px] text-[#49454F] mt-1 leading-snug">{notif.message}</p>
-                            <span className="text-[9px] text-[#79747E] font-mono mt-1 block">{notif.date}</span>
+                        <div key={notif.id} className="bg-[#F7F2FA] p-2.5 rounded-lg border border-[#CAC4D0] flex items-start justify-between gap-2 shadow-2xs">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className={`w-4 h-4 mt-0.5 shrink-0 ${notif.type === 'alert' || notif.type === 'warning' ? 'text-[#B3261E]' : 'text-[#6750A4]'}`} />
+                            <div>
+                              <p className="text-xs font-semibold text-[#1C1B1F] leading-tight">{notif.title}</p>
+                              <p className="text-[11px] text-[#49454F] mt-0.5 leading-snug">{notif.message}</p>
+                              <span className="text-[9px] text-[#79747E] font-mono mt-1 block">{notif.date}</span>
+                            </div>
                           </div>
+                          <button 
+                            onClick={() => handleDismissNotification(notif.id)}
+                            className="text-[#79747E] hover:text-[#1C1B1F] p-0.5 shrink-0"
+                            title="Dismiss notification"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       ))}
                     </div>
