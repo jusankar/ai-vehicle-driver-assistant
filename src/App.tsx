@@ -45,6 +45,7 @@ import {
 import { FleetDatabase, ChatMessage, Vehicle, Driver, FuelLog, ExpenseLog, NotificationItem } from "./types";
 import { flutterProjectFiles, FlutterFile } from "./flutterCode";
 import ReportsView from "./components/ReportsView";
+import { translations, Language } from "./i18n";
 import { 
   uploadCloudDocument, 
   submitExpenseLog, 
@@ -67,9 +68,78 @@ interface IWindow extends Window {
 const windowWithSpeech = window as unknown as IWindow;
 
 export default function App() {
+  // Language Toggle State (English / Tamil)
+  const [lang, setLang] = useState<Language>('en');
+
   // Mobile Simulator State
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'fleet' | 'drivers' | 'vault' | 'reminders' | 'reports'>('home');
   const [fleet, setFleet] = useState<FleetDatabase | null>(null);
+
+  const t = (key: keyof typeof translations['en']): string => {
+    return translations[lang][key] || translations['en'][key];
+  };
+
+  const getDynamicBanner = () => {
+    if (!fleet || !fleet.vehicles || fleet.vehicles.length === 0) {
+      return {
+        title: lang === 'en' ? "Fleet Database Initializing" : "வாகன தரவுத்தளம் தொடங்குகிறது",
+        description: lang === 'en' ? "Loading vehicle and driver records..." : "வாகன மற்றும் ஓட்டுநர் தகவல்கள் ஏற்றப்படுகின்றன..."
+      };
+    }
+
+    const total = fleet.vehicles.length;
+    const activeCount = fleet.vehicles.filter(v => v.status === 'Active').length;
+    const maintenanceCount = fleet.vehicles.filter(v => v.status === 'Maintenance').length;
+    
+    const now = new Date();
+    const issues: string[] = [];
+
+    fleet.vehicles.forEach(v => {
+      if (v.insuranceExpiry) {
+        const exp = new Date(v.insuranceExpiry);
+        const diffDays = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 3600 * 24));
+        if (diffDays <= 30 && diffDays >= 0) {
+          issues.push(`${v.plateNumber} ${lang === 'en' ? 'Insurance expires in' : 'இன்சூரன்ஸ் முடிவு'} ${diffDays} ${lang === 'en' ? 'days' : 'நாட்களில்'}`);
+        } else if (diffDays < 0) {
+          issues.push(`${v.plateNumber} ${lang === 'en' ? 'Insurance EXPIRED' : 'இன்சூரன்ஸ் முடிந்தது'}`);
+        }
+      }
+      if (v.fitnessExpiry) {
+        const exp = new Date(v.fitnessExpiry);
+        const diffDays = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 3600 * 24));
+        if (diffDays <= 30 && diffDays >= 0) {
+          issues.push(`${v.plateNumber} ${lang === 'en' ? 'Fitness FC expires in' : 'FC முடிவு'} ${diffDays} ${lang === 'en' ? 'days' : 'நாட்களில்'}`);
+        } else if (diffDays < 0) {
+          issues.push(`${v.plateNumber} ${lang === 'en' ? 'Fitness FC EXPIRED' : 'FC முடிந்தது'}`);
+        }
+      }
+    });
+
+    if (issues.length > 0) {
+      return {
+        title: lang === 'en' ? "Fleet Attention Needed" : "வாகன கவனக் குறிப்பு",
+        description: lang === 'en' 
+          ? `${activeCount} of ${total} vehicles active. Attention needed: ${issues.join(', ')}.`
+          : `${activeCount} / ${total} வாகனங்கள் செயலில் உள்ளன. கவனத்திற்கு: ${issues.join(', ')}.`
+      };
+    }
+
+    if (maintenanceCount > 0) {
+      return {
+        title: lang === 'en' ? "Fleet Partial Maintenance" : "வாகனம் பராமரிப்பு நிலை",
+        description: lang === 'en'
+          ? `${activeCount} of ${total} vehicles active, ${maintenanceCount} in maintenance.`
+          : `${activeCount} / ${total} வாகனங்கள் செயலில் உள்ளன, ${maintenanceCount} பராமரிப்பில் உள்ளன.`
+      };
+    }
+
+    return {
+      title: lang === 'en' ? "Your Fleet is Healthy" : "உங்கள் வாகனப் படை சீராக உள்ளது",
+      description: lang === 'en'
+        ? `All ${total} trucks active with up-to-date insurance, fitness & permits.`
+        : `அனைத்து ${total} வாகனங்களும் இன்சூரன்ஸ் மற்றும் எஃப்.சி உடன் சீராக இயங்குகின்றன.`
+    };
+  };
 
   // Material 3 Theme Toggle State (Light Day / High-Contrast Dark Night Mode for Fleet Management)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -1189,6 +1259,25 @@ export default function App() {
                     <span>{pendingSyncItems.length > 0 ? `${pendingSyncItems.length} Sync` : 'SW Sync'}</span>
                   </button>
 
+                  {/* Language Switcher (English / Tamil) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextLang = lang === 'en' ? 'ta' : 'en';
+                      setLang(nextLang);
+                      triggerToast(nextLang === 'ta' ? "🇮🇳 தமிழ் மொழிக்கு மாற்றப்பட்டது!" : "🇬🇧 Switched to English!");
+                    }}
+                    title="Toggle Language / மொழி மாற்றுக"
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors flex items-center gap-1 border ${
+                      isDarkMode 
+                        ? 'bg-[#2B2930] text-[#D0BCFF] border-[#49454F] hover:bg-[#36343B]' 
+                        : 'bg-[#EADDFF] text-[#21005D] border-[#CAC4D0] hover:bg-[#E8DEF8]'
+                    }`}
+                  >
+                    <span>🌐</span>
+                    <span>{lang === 'en' ? 'தமிழ்' : 'EN'}</span>
+                  </button>
+
                   {/* Theme Mode Button in App Bar */}
                   <button 
                     type="button"
@@ -1338,11 +1427,13 @@ export default function App() {
                       <div className="bg-gradient-to-br from-[#EADDFF] to-[#D8C9EF] p-4 rounded-2xl border border-[#CAC4D0] shadow-sm">
                         <div className="flex items-center gap-1.5 text-[#21005D] text-[10px] font-bold uppercase tracking-wider mb-2">
                           <Sparkles className="w-3.5 h-3.5 text-[#6750A4]" />
-                          AI-Powered Mobile Fleet
+                          {lang === 'en' ? 'AI FLEET ASSISTANT' : 'AI வாகன உதவியாளர்'}
                         </div>
-                        <h3 className="text-lg font-bold text-[#21005D] leading-tight">Your fleet is running healthy</h3>
+                        <h3 className="text-lg font-bold text-[#21005D] leading-tight">
+                          {getDynamicBanner().title}
+                        </h3>
                         <p className="text-[#49454F] text-xs mt-1.5 leading-snug">
-                          All 4 heavy trucks online. 1 schedule alarm logged. Ask the assistant to view or make changes.
+                          {getDynamicBanner().description}
                         </p>
                       </div>
 
@@ -3843,7 +3934,7 @@ export default function App() {
                       transition={{ duration: 0.18, ease: "easeOut" }}
                       className="flex-1"
                     >
-                      <ReportsView fleet={fleet} triggerToast={triggerToast} isDarkMode={isDarkMode} />
+                      <ReportsView fleet={fleet} triggerToast={triggerToast} isDarkMode={isDarkMode} lang={lang} />
                     </motion.div>
                   )}
                 </AnimatePresence>

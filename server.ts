@@ -1369,7 +1369,7 @@ IMPORTANT DIRECTIONS:
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents: contents,
       config: {
         systemInstruction: systemInstruction + "\n\n" + dbContext,
@@ -1612,7 +1612,7 @@ Guidelines:
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents: { parts: [docPart, textPart] },
       config: {
         responseMimeType: "application/json",

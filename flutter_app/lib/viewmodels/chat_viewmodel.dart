@@ -22,7 +22,7 @@ class ChatViewModel extends ChangeNotifier {
   String _apiKey = const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
 
   ChatViewModel({String? apiKey}) {
-    if (apiKey != null && apiKey.isNotEmpty && !apiKey.startsWith('AIzaSyDUdO3E87oQCUTZ2r8ycdWvN5Sq6dbXdHc') && apiKey != "YOUR_GEMINI_API_KEY") {
+    if (apiKey != null && apiKey.isNotEmpty && apiKey != "YOUR_GEMINI_API_KEY") {
       _apiKey = apiKey;
     }
     _initModel();
@@ -42,7 +42,7 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
 """;
 
     _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       apiKey: _apiKey.isNotEmpty ? _apiKey : 'UNCONFIGURED_KEY',
       systemInstruction: Content.system(systemInstructionText),
     );

@@ -107,6 +107,18 @@ class _HomeDashboardContent extends StatelessWidget {
         actions: [
           Consumer<FleetViewModel>(
             builder: (context, vm, child) {
+              return TextButton.icon(
+                onPressed: () => vm.toggleLanguage(),
+                icon: const Icon(Icons.language, size: 18),
+                label: Text(
+                  vm.isTamil ? 'தமிழ்' : 'EN',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              );
+            },
+          ),
+          Consumer<FleetViewModel>(
+            builder: (context, vm, child) {
               final notifCount = vm.getNotifications().length;
               return IconButton(
                 icon: Badge(
@@ -130,7 +142,7 @@ class _HomeDashboardContent extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Hello Greeting Hero
-              _buildHeaderCard(context, theme),
+              _buildHeaderCard(context, theme, fleetVM),
               const SizedBox(height: 24),
 
               // Fleet Portal Section
@@ -265,7 +277,61 @@ class _HomeDashboardContent extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderCard(BuildContext context, ThemeData theme) {
+  Widget _buildHeaderCard(BuildContext context, ThemeData theme, FleetViewModel vm) {
+    final vehicles = vm.vehicles;
+    final totalCount = vehicles.length;
+    final activeCount = vehicles.where((v) => v.status == 'Active').length;
+    final maintenanceCount = vehicles.where((v) => v.status == 'Maintenance').length;
+
+    List<String> issues = [];
+    final now = DateTime.now();
+    for (var v in vehicles) {
+      if (v.insuranceExpiry != null && v.insuranceExpiry!.isNotEmpty) {
+        try {
+          final exp = DateTime.parse(v.insuranceExpiry!);
+          final diffDays = exp.difference(now).inDays;
+          if (diffDays <= 30 && diffDays >= 0) {
+            issues.add('${v.plateNumber} ${vm.tr("Insurance expires in", "இன்சூரன்ஸ் முடிவு")} $diffDays ${vm.tr("days", "நாட்களில்")}');
+          } else if (diffDays < 0) {
+            issues.add('${v.plateNumber} ${vm.tr("Insurance EXPIRED", "இன்சூரன்ஸ் முடிந்தது")}');
+          }
+        } catch (_) {}
+      }
+      if (v.fitnessExpiry != null && v.fitnessExpiry!.isNotEmpty) {
+        try {
+          final exp = DateTime.parse(v.fitnessExpiry!);
+          final diffDays = exp.difference(now).inDays;
+          if (diffDays <= 30 && diffDays >= 0) {
+            issues.add('${v.plateNumber} ${vm.tr("Fitness FC expires in", "FC முடிவு")} $diffDays ${vm.tr("days", "நாட்களில்")}');
+          } else if (diffDays < 0) {
+            issues.add('${v.plateNumber} ${vm.tr("Fitness FC EXPIRED", "FC முடிந்தது")}');
+          }
+        } catch (_) {}
+      }
+    }
+
+    String bannerTitle = issues.isNotEmpty
+        ? vm.tr('Fleet Attention Needed', 'வாகன கவனக் குறிப்பு')
+        : vm.tr('Your Fleet is Healthy', 'உங்கள் வாகனப் படை சீராக உள்ளது');
+
+    String bannerDetail = '';
+    if (issues.isNotEmpty) {
+      bannerDetail = vm.tr(
+        'All $activeCount of $totalCount vehicles active. Attention needed: ${issues.join(", ")}.',
+        '$activeCount / $totalCount வாகனங்கள் செயல்பாட்டில் உள்ளன. கவனத்திற்கு: ${issues.join(", ")}.'
+      );
+    } else if (maintenanceCount > 0) {
+      bannerDetail = vm.tr(
+        '$activeCount of $totalCount vehicles active, $maintenanceCount in maintenance.',
+        '$activeCount வாகனங்கள் செயல்பாட்டில் உள்ளன, $maintenanceCount பராமரிப்பில் உள்ளன.'
+      );
+    } else {
+      bannerDetail = vm.tr(
+        'All $totalCount trucks active with up-to-date insurance & fitness certificates.',
+        'அனைத்து $totalCount வாகனங்களும் இன்சூரன்ஸ் மற்றும் எஃப்.சி சான்றிதழ்களுடன் இயங்குகின்றன.'
+      );
+    }
+
     return Card(
       elevation: 0,
       color: theme.colorScheme.primaryContainer,
@@ -279,7 +345,7 @@ class _HomeDashboardContent extends StatelessWidget {
                 Icon(Icons.auto_awesome, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'AI FLEET ASSISTANT',
+                  vm.tr('AI FLEET ASSISTANT', 'AI வாகன உதவியாளர்'),
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.bold,
@@ -290,7 +356,7 @@ class _HomeDashboardContent extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Your Fleet is Healthy',
+              bannerTitle,
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.onPrimaryContainer,
@@ -298,7 +364,7 @@ class _HomeDashboardContent extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'All 4 trucks active. 1 vehicle needs attention soon (TN68CD5678 Insurance expires in 8 days).',
+              bannerDetail,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onPrimaryContainer.withOpacity(0.8),
               ),

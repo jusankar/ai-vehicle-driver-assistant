@@ -9,6 +9,26 @@ class FleetViewModel extends ChangeNotifier {
   final List<ExpenseLog> _expenseLogs = [];
   final List<CloudDocument> _uploadedDocuments = [];
 
+  String _language = 'en';
+  String get language => _language;
+  bool get isTamil => _language == 'ta';
+
+  void toggleLanguage() {
+    _language = (_language == 'en') ? 'ta' : 'en';
+    notifyListeners();
+  }
+
+  void setLanguage(String lang) {
+    if (lang == 'en' || lang == 'ta') {
+      _language = lang;
+      notifyListeners();
+    }
+  }
+
+  String tr(String enText, String taText) {
+    return isTamil ? taText : enText;
+  }
+
   List<Vehicle> get vehicles => _vehicles;
   List<Driver> get drivers => _drivers;
   List<FuelLog> get fuelLogs => _fuelLogs;

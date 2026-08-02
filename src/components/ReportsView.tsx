@@ -29,6 +29,7 @@ interface ReportsViewProps {
   fleet: FleetDatabase | null;
   triggerToast: (msg: string) => void;
   isDarkMode?: boolean;
+  lang?: 'en' | 'ta';
 }
 
 type ReportType = 
@@ -46,7 +47,7 @@ type ReportType =
   | 'monthly'
   | 'yearly';
 
-export default function ReportsView({ fleet, triggerToast, isDarkMode = false }: ReportsViewProps) {
+export default function ReportsView({ fleet, triggerToast, isDarkMode = false, lang = 'en' }: ReportsViewProps) {
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
   
   // Filter States
