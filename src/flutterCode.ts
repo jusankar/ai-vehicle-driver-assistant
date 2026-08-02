@@ -1096,7 +1096,7 @@ Expense Logs: \${jsonEncode(fleetVM.expenseLogs.map((e) => e.toJson()).toList())
       final contents = <Content>[];
       
       // Pass grounding context as first user prompt
-      contents.add(Content.text("FLEET DATABASE CONTEXT:\n\$dbContext"));
+      contents.add(Content.text("FLEET DATABASE CONTEXT:\\n\$dbContext"));
       
       // Append history & new message
       for (final msg in _messages) {
