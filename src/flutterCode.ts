@@ -5649,12 +5649,56 @@ flutter {
 </resources>`
   },
   {
+    path: "android/app/src/main/res/drawable/ic_launcher_bg.xml",
+    language: "xml",
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="135"
+        android:startColor="#0F172A"
+        android:endColor="#1E3A8A" />
+</shape>`
+  },
+  {
+    path: "android/app/src/main/res/drawable/ic_launcher_fg.xml",
+    language: "xml",
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1E88E5"
+        android:pathData="M54,18 C34.1,18 18,34.1 18,54 C18,73.9 34.1,90 54,90 C73.9,90 90,73.9 90,54 C90,34.1 73.9,18 54,18 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,42 H60 V64 H34 Z M60,48 H72 L76,56 V64 H60 Z"/>
+    <path
+        android:fillColor="#0D47A1"
+        android:pathData="M62,50 H70 L72,55 H62 Z"/>
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M40,64 A4,4 0 1,0 40,72 A4,4 0 1,0 40,64 Z M66,64 A4,4 0 1,0 66,72 A4,4 0 1,0 66,64 Z"/>
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M40,66 A2,2 0 1,0 40,70 A2,2 0 1,0 40,66 Z M66,66 A2,2 0 1,0 66,70 A2,2 0 1,0 66,66 Z"/>
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M76,32 L78,37 L83,39 L78,41 L76,46 L74,41 L69,39 L74,37 Z"/>
+    <path
+        android:fillColor="#60A5FA"
+        android:pathData="M30,30 L31,33 L34,34 L31,35 L30,38 L29,35 L26,34 L29,33 Z"/>
+</vector>`
+  },
+  {
     path: "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
     language: "xml",
     content: `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/launch_background" />
-    <foreground android:drawable="@drawable/launch_background" />
+    <background android:drawable="@drawable/ic_launcher_bg" />
+    <foreground android:drawable="@drawable/ic_launcher_fg" />
 </adaptive-icon>`
   },
   {
@@ -5662,7 +5706,31 @@ flutter {
     language: "xml",
     content: `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:attr/colorBackground" />
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:startColor="#0F172A"
+                android:endColor="#1E3A8A" />
+        </shape>
+    </item>
+    <item android:gravity="center">
+        <vector
+            android:width="96dp"
+            android:height="96dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+                android:fillColor="#1E88E5"
+                android:pathData="M54,18 C34.1,18 18,34.1 18,54 C18,73.9 34.1,90 54,90 C73.9,90 90,73.9 90,54 C90,34.1 73.9,18 54,18 Z"/>
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M34,42 H60 V64 H34 Z M60,48 H72 L76,56 V64 H60 Z"/>
+            <path
+                android:fillColor="#0D47A1"
+                android:pathData="M62,50 H70 L72,55 H62 Z"/>
+        </vector>
+    </item>
 </layer-list>`
   },
   {

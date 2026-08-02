@@ -1,4 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:attr/colorBackground" />
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:startColor="#0F172A"
+                android:endColor="#1E3A8A" />
+        </shape>
+    </item>
+    <item android:gravity="center">
+        <vector
+            android:width="96dp"
+            android:height="96dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+                android:fillColor="#1E88E5"
+                android:pathData="M54,18 C34.1,18 18,34.1 18,54 C18,73.9 34.1,90 54,90 C73.9,90 90,73.9 90,54 C90,34.1 73.9,18 54,18 Z"/>
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M34,42 H60 V64 H34 Z M60,48 H72 L76,56 V64 H60 Z"/>
+            <path
+                android:fillColor="#0D47A1"
+                android:pathData="M62,50 H70 L72,55 H62 Z"/>
+        </vector>
+    </item>
 </layer-list>
