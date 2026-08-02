@@ -1095,8 +1095,8 @@ Expense Logs: \${jsonEncode(fleetVM.expenseLogs.map((e) => e.toJson()).toList())
 
       final contents = <Content>[];
       
-      // Pass grounding context as first user prompt
-      contents.add(Content.text("FLEET DATABASE CONTEXT:\\n\$dbContext"));
+      // Pass grounding context as first user prompt (single line string)
+      contents.add(Content.text("FLEET DATABASE CONTEXT: " + dbContext));
       
       // Append history & new message
       for (final msg in _messages) {
@@ -4833,8 +4833,8 @@ distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14-all.zip
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "8.7.3" apply false
-    id "org.jetbrains.kotlin.android" version "2.0.21" apply false
+    id "com.android.application" version "8.11.1" apply false
+    id "org.jetbrains.kotlin.android" version "2.2.20" apply false
 }
 
 include ":app"
@@ -4904,12 +4904,12 @@ android {
     ndkVersion flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'
     }
 
     defaultConfig {
@@ -4946,6 +4946,28 @@ flutter {
 </resources>`
   },
   {
+    path: "android/app/src/main/res/values-night/styles.xml",
+    language: "xml",
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">?android:attr/colorBackground</item>
+    </style>
+</resources>`
+  },
+  {
+    path: "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+    language: "xml",
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/launch_background" />
+    <foreground android:drawable="@drawable/launch_background" />
+</adaptive-icon>`
+  },
+  {
     path: "android/app/src/main/res/drawable/launch_background.xml",
     language: "xml",
     content: `<?xml version="1.0" encoding="utf-8"?>
@@ -4964,7 +4986,7 @@ flutter {
     <application
         android:label="Fleet AI Assistant"
         android:name="\${applicationName}"
-        android:icon="@android:drawable/sym_def_app_icon">
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
