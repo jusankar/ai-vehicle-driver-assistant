@@ -660,23 +660,19 @@ class FleetViewModel extends ChangeNotifier {
     }
 
     for (final d in _drivers) {
-      if (d.licenseExpiry.isNotEmpty) {
-        try {
-          final licDt = DateTime.parse(d.licenseExpiry);
-          final days = licDt.difference(today).inDays;
-          if (days <= 30) {
-            final id = 'notif_lic_\${d.id}';
-            if (!_dismissedNotificationIds.contains(id)) {
-              list.add(FleetAppNotification(
-                id: id,
-                title: days <= 0 ? 'LICENSE EXPIRED: \${d.name}' : 'License Expiry: \${d.name}',
-                message: 'Driver \${d.name} (\${d.licenseNumber}) driving license \${days <= 0 ? "EXPIRED on \${d.licenseExpiry}" : "expires in \$days days"}.',
-                date: '2026-07-17',
-                type: days <= 0 ? 'alert' : 'warning',
-              ));
-            }
-          }
-        } catch (_) {}
+      final days = d.licenseExpiry.difference(today).inDays;
+      if (days <= 30) {
+        final id = 'notif_lic_\${d.id}';
+        if (!_dismissedNotificationIds.contains(id)) {
+          final licStr = d.licenseExpiry.toIso8601String().split('T')[0];
+          list.add(FleetAppNotification(
+            id: id,
+            title: days <= 0 ? 'LICENSE EXPIRED: \${d.name}' : 'License Expiry: \${d.name}',
+            message: 'Driver \${d.name} (\${d.licenseNumber}) driving license \${days <= 0 ? "EXPIRED on \$licStr" : "expires in \$days days (\$licStr)"}.',
+            date: '2026-07-17',
+            type: days <= 0 ? 'alert' : 'warning',
+          ));
+        }
       }
       if (d.advance > 10000) {
         final id = 'notif_adv_\${d.id}';
@@ -1688,9 +1684,9 @@ class _HomeDashboardContent extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.blueContainer,
-                child: Icon(Icons.camera_alt, color: Colors.blue),
+              leading: CircleAvatar(
+                backgroundColor: Colors.blue.withOpacity(0.15),
+                child: const Icon(Icons.camera_alt, color: Colors.blue),
               ),
               title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Capture receipt directly with camera'),
@@ -1705,9 +1701,9 @@ class _HomeDashboardContent extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.greenContainer,
-                child: Icon(Icons.photo_library, color: Colors.green),
+              leading: CircleAvatar(
+                backgroundColor: Colors.green.withOpacity(0.15),
+                child: const Icon(Icons.photo_library, color: Colors.green),
               ),
               title: const Text('Choose Image from Gallery', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Select receipt image from photo library'),
@@ -1722,9 +1718,9 @@ class _HomeDashboardContent extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.orangeContainer,
-                child: Icon(Icons.picture_as_pdf, color: Colors.orange),
+              leading: CircleAvatar(
+                backgroundColor: Colors.orange.withOpacity(0.15),
+                child: const Icon(Icons.picture_as_pdf, color: Colors.orange),
               ),
               title: const Text('Select PDF or Document File', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Browse PDF, Word, or Excel file from storage'),

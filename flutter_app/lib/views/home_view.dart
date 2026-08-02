@@ -597,9 +597,9 @@ class _HomeDashboardContent extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.blueContainer,
-                child: Icon(Icons.camera_alt, color: Colors.blue),
+              leading: CircleAvatar(
+                backgroundColor: Colors.blue.withOpacity(0.15),
+                child: const Icon(Icons.camera_alt, color: Colors.blue),
               ),
               title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Capture receipt directly with camera'),
@@ -614,9 +614,9 @@ class _HomeDashboardContent extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.greenContainer,
-                child: Icon(Icons.photo_library, color: Colors.green),
+              leading: CircleAvatar(
+                backgroundColor: Colors.green.withOpacity(0.15),
+                child: const Icon(Icons.photo_library, color: Colors.green),
               ),
               title: const Text('Choose Image from Gallery', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Select receipt image from photo library'),
@@ -631,9 +631,9 @@ class _HomeDashboardContent extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.orangeContainer,
-                child: Icon(Icons.picture_as_pdf, color: Colors.orange),
+              leading: CircleAvatar(
+                backgroundColor: Colors.orange.withOpacity(0.15),
+                child: const Icon(Icons.picture_as_pdf, color: Colors.orange),
               ),
               title: const Text('Select PDF or Document File', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Browse PDF, Word, or Excel file from storage'),

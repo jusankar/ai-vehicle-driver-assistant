@@ -194,23 +194,19 @@ class FleetViewModel extends ChangeNotifier {
     }
 
     for (final d in _drivers) {
-      if (d.licenseExpiry.isNotEmpty) {
-        try {
-          final licDt = DateTime.parse(d.licenseExpiry);
-          final days = licDt.difference(today).inDays;
-          if (days <= 30) {
-            final id = 'notif_lic_${d.id}';
-            if (!_dismissedNotificationIds.contains(id)) {
-              list.add(FleetAppNotification(
-                id: id,
-                title: days <= 0 ? 'LICENSE EXPIRED: ${d.name}' : 'License Expiry: ${d.name}',
-                message: 'Driver ${d.name} (${d.licenseNumber}) driving license ${days <= 0 ? "EXPIRED on ${d.licenseExpiry}" : "expires in $days days"}.',
-                date: '2026-07-17',
-                type: days <= 0 ? 'alert' : 'warning',
-              ));
-            }
-          }
-        } catch (_) {}
+      final days = d.licenseExpiry.difference(today).inDays;
+      if (days <= 30) {
+        final id = 'notif_lic_${d.id}';
+        if (!_dismissedNotificationIds.contains(id)) {
+          final licStr = d.licenseExpiry.toIso8601String().split('T')[0];
+          list.add(FleetAppNotification(
+            id: id,
+            title: days <= 0 ? 'LICENSE EXPIRED: ${d.name}' : 'License Expiry: ${d.name}',
+            message: 'Driver ${d.name} (${d.licenseNumber}) driving license ${days <= 0 ? "EXPIRED on $licStr" : "expires in $days days ($licStr)"}.',
+            date: '2026-07-17',
+            type: days <= 0 ? 'alert' : 'warning',
+          ));
+        }
       }
       if (d.advance > 10000) {
         final id = 'notif_adv_${d.id}';
