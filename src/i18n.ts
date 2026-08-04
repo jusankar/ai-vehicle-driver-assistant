@@ -1,4 +1,4 @@
-export type Language = 'en' | 'ta';
+export type Language = 'en';
 
 export const translations = {
   en: {
@@ -6,9 +6,8 @@ export const translations = {
     appName: "AI Fleet & Driver Assistant",
     language: "Language",
     english: "English",
-    tamil: "தமிழ்",
     home: "Home",
-    assistant: "AI Assistant",
+    assistant: "Ask AI",
     fleet: "Fleet",
     drivers: "Drivers",
     vault: "Document Vault",
@@ -46,12 +45,12 @@ export const translations = {
     activeVehicles: "Active Vehicles",
     activeDrivers: "Active Drivers",
     pendingReminders: "Pending Reminders",
-    julyTotal: "July Total",
+    julyTotal: "Total Cost",
     loggedItems: "Logged Items",
     
     // Quick Actions
     quickActions: "Quick Actions",
-    askAi: "Ask AI Assistant",
+    askAi: "Ask AI",
     addVehicle: "Add Vehicle",
     addDriver: "Add Driver",
     uploadDoc: "Upload Document",
@@ -117,8 +116,8 @@ export const translations = {
     typeMessage: "Ask anything in natural language about your fleet...",
     send: "Send",
     clearChat: "Clear Chat",
-    aiConnecting: "Connecting to AI Assistant...",
-    aiError: "Error connecting to assistant.",
+    aiConnecting: "Connecting to AI...",
+    aiError: "Error connecting to AI.",
 
     // Common
     save: "Save",
@@ -128,134 +127,7 @@ export const translations = {
     edit: "Edit",
     submit: "Submit",
     loading: "Loading...",
-  },
-  ta: {
-    // Header & Nav
-    appName: "AI வாகனம் & ஓட்டுநர் உதவி",
-    language: "மொழி",
-    english: "English",
-    tamil: "தமிழ்",
-    home: "முகப்பு",
-    assistant: "AI உதவியாளர்",
-    fleet: "வாகனங்கள்",
-    drivers: "ஓட்டுநர்கள்",
-    vault: "ஆவணப் பெட்டகம்",
-    reminders: "நினைவூட்டல்கள்",
-    reports: "அறிக்கைகள்",
-    settings: "அமைப்புகள்",
-
-    // Configuration & Settings
-    instanceConfig: "கிளையன்ட் & AI அமைப்புகள்",
-    instanceConfigSub: "உங்கள் கிளையன்ட் ஐடி மற்றும் AI வழங்குநரை (Gemini, OpenAI, Claude, அல்லது Custom) அமைக்கவும்.",
-    clientIdLabel: "கிளையன்ட் இன்ஸ்டன்ஸ் ஐடி (Client Instance ID)",
-    clientIdHelp: "இந்த ஐடியின் கீழ் உங்கள் அனைத்து தரவுகளும் தனித்தனியாக பாதுகாப்பாக சேமிக்கப்படும்.",
-    aiProviderLabel: "AI வழங்குநர் (AI Provider)",
-    apiKeyLabel: "API சாவி (API Key)",
-    apiKeyPlaceholder: "உங்கள் API சாவியை இங்கே ஒட்டவும்",
-    modelNameLabel: "மாடல் பெயர் (Model Name)",
-    baseUrlLabel: "தள முகவரி (Base URL - விருப்பத்தேர்வு)",
-    baseUrlPlaceholder: "எ.கா., https://api.openai.com/v1",
-    testConnection: "AI இணைப்பை சோதிக்கவும்",
-    testing: "சோதிக்கிறது...",
-    saveConfig: "அமைப்புகளை சேமிக்க",
-    configSavedSuccess: "அமைப்புகள் வெற்றிகரமாக சேமிக்கப்பட்டன!",
-    connectionSuccess: "AI இணைப்பு வெற்றிகரமாக முடிந்தது!",
-    connectionFailed: "AI இணைப்பு தோல்வியடைந்தது: ",
-    dataPersistenceNote: "மொபைல் ஆப் தரவு சேமிப்பு: இயக்கப்பட்டது. அனைத்து தரவுகளும் உங்கள் மொபைலில் பாதுகாப்பாக சேமிக்கப்படும்.",
-    resetInstanceData: "உள்ளூர் தரவை மீட்டமைக்க",
-    resetDataWarning: "இந்த இன்ஸ்டன்ஸ் ஐடியின் உள்ளூர் தரவை மீட்டமைக்க நிச்சயமாக விரும்புகிறீர்களா?",
-    
-    // Home Banner & Stats
-    fleetHealthy: "உங்கள் வாகனப் படை நிலை",
-    fleetAttentionNeeded: "வாகன கவனக் குறிப்பு",
-    dieselFilled: "டீசல் நிரப்பப்பட்டது",
-    fuelCost: "எரிபொருள் செலவு",
-    repairsTolls: "பராமரிப்பு & டோல் செலவு",
-    activeVehicles: "செயலில் உள்ள வாகனங்கள்",
-    activeDrivers: "செயலில் உள்ள ஓட்டுநர்கள்",
-    pendingReminders: "நிலுவையில் உள்ள நினைவூட்டல்கள்",
-    julyTotal: "ஜூலை மொத்தம்",
-    loggedItems: "பதிவு செய்யப்பட்டவை",
-    
-    // Quick Actions
-    quickActions: "விரைவுச் செயல்கள்",
-    askAi: "AI உதவியாளரிடம் கேட்க",
-    addVehicle: "வாகனம் சேர்க்க",
-    addDriver: "ஓட்டுநர் சேர்க்க",
-    uploadDoc: "ஆவணம் பதிவேற்ற",
-    viewReports: "அறிக்கைகளைப் பார்க்க",
-    configureAi: "AI அமைப்புகளை மாற்ற",
-    
-    // Fleet / Vehicles
-    vehicleManagement: "வாகன மேலாண்மை",
-    searchVehicles: "எண் அல்லது மாடலைத் தேடுக...",
-    registerNewVehicle: "புதிய வாகனம் பதிவு செய்",
-    plateNumber: "வாகன எண்",
-    model: "மாடல்",
-    assignedDriver: "ஒதுக்கப்பட்ட ஓட்டுநர்",
-    status: "நிலை",
-    odometer: "ஓடோமீட்டர்",
-    insuranceExpiry: "இன்சூரன்ஸ் முடிவு",
-    fitnessExpiry: "எஃப்.சி (FC) முடிவு",
-    actions: "செயல்கள்",
-    viewDetails: "விவரங்களைப் பார்க்க",
-    active: "செயலில்",
-    maintenance: "பராமரிப்பில்",
-    inactive: "செயலிழந்து",
-    
-    // Drivers
-    driverManagement: "ஓட்டுநர் மேலாண்மை",
-    searchDrivers: "பெயர் அல்லது போன் எண்ணைத் தேடுக...",
-    registerNewDriver: "புதிய ஓட்டுநர் பதிவு செய்",
-    phone: "தொலைபேசி",
-    licenseNumber: "லைசென்ஸ் எண்",
-    joiningDate: "சேர்ந்த தேதி",
-    attendance: "வருகைப் பதிவு",
-    salary: "சம்பளம்",
-    advanceHistory: "முன்பணம் வரலாறு",
-    markAttendance: "வருகை பதிவு செய்",
-    present: "வந்துள்ளார்",
-    absent: "வரவில்லை",
-    leave: "விடுப்பு",
-    giveAdvance: "முன்பணம் வழங்கு",
-    
-    // Vault
-    documentVault: "மேகக்கணி ஆவணப் பெட்டகம்",
-    uploadDocument: "ஆவணம் / பில் பதிவேற்ற",
-    allDocuments: "அனைத்து ஆவணங்கள்",
-    insurancePdfs: "இன்சூரன்ஸ் ஆவணங்கள்",
-    fuelBills: "டீசல் பில்கள்",
-    serviceBills: "சர்வீஸ் பில்கள்",
-    
-    // Reminders
-    reminderSchedule: "புதுப்பித்தல் & செலவு நினைவூட்டல்",
-    addNewReminder: "புதிய நினைவூட்டல் சேர்க்க",
-    title: "தலைப்பு",
-    category: "வகை",
-    dueDate: "கடைசி தேதி",
-    frequency: "அதிர்வெண்",
-    
-    // Reports
-    reportsAnalytics: "வாகன திறன் & செலவு பகுப்பாய்வு",
-    totalFuelExpense: "மொத்த டீசல் செலவு",
-    totalMaintenanceExpense: "மொத்த பராமரிப்பு",
-    costPerKm: "கிமீ செலவு",
-
-    // Assistant Chat
-    typeMessage: "இயற்கையான தமிழில் அல்லது ஆங்கிலத்தில் உங்கள் வாகனப் கேள்விகளைக் கேட்கவும்...",
-    send: "அனுப்பு",
-    clearChat: "உரையாடலை அழிக்க",
-    aiConnecting: "AI உதவியாளருடன் இணைக்கிறது...",
-    aiError: "AI உதவியாளருடன் தொடர்பு கொள்ள முடியவில்லை.",
-
-    // Common
-    save: "சேமி",
-    cancel: "ரத்து செய்",
-    close: "மூடு",
-    delete: "நீக்கு",
-    edit: "திருத்து",
-    submit: "சமர்ப்பி",
-    loading: "ஏற்றுகிறது...",
   }
 };
+
 

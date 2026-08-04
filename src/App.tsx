@@ -68,9 +68,6 @@ interface IWindow extends Window {
 const windowWithSpeech = window as unknown as IWindow;
 
 export default function App() {
-  // Language Toggle State (English / Tamil)
-  const [lang, setLang] = useState<Language>('en');
-
   // Instance & Multi-Provider AI Configuration State
   const [clientId, setClientId] = useState<string>(() => localStorage.getItem("fleet_client_id") || "CLIENT_DEFAULT");
   const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'claude' | 'custom'>(() => (localStorage.getItem("fleet_ai_provider") as any) || "gemini");
@@ -87,14 +84,14 @@ export default function App() {
   const [fleet, setFleet] = useState<FleetDatabase | null>(null);
 
   const t = (key: keyof typeof translations['en']): string => {
-    return translations[lang][key] || translations['en'][key];
+    return translations.en[key] || key;
   };
 
   const getDynamicBanner = () => {
     if (!fleet || !fleet.vehicles || fleet.vehicles.length === 0) {
       return {
-        title: lang === 'en' ? "Fleet Database Initializing" : "வாகன தரவுத்தளம் தொடங்குகிறது",
-        description: lang === 'en' ? "Loading vehicle and driver records..." : "வாகன மற்றும் ஓட்டுநர் தகவல்கள் ஏற்றப்படுகின்றன..."
+        title: "Fleet Database Initializing",
+        description: "Loading vehicle and driver records..."
       };
     }
 
@@ -110,45 +107,39 @@ export default function App() {
         const exp = new Date(v.insuranceExpiry);
         const diffDays = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 3600 * 24));
         if (diffDays <= 30 && diffDays >= 0) {
-          issues.push(`${v.plateNumber} ${lang === 'en' ? 'Insurance expires in' : 'இன்சூரன்ஸ் முடிவு'} ${diffDays} ${lang === 'en' ? 'days' : 'நாட்களில்'}`);
+          issues.push(`${v.plateNumber} Insurance expires in ${diffDays} days`);
         } else if (diffDays < 0) {
-          issues.push(`${v.plateNumber} ${lang === 'en' ? 'Insurance EXPIRED' : 'இன்சூரன்ஸ் முடிந்தது'}`);
+          issues.push(`${v.plateNumber} Insurance EXPIRED`);
         }
       }
       if (v.fitnessExpiry) {
         const exp = new Date(v.fitnessExpiry);
         const diffDays = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 3600 * 24));
         if (diffDays <= 30 && diffDays >= 0) {
-          issues.push(`${v.plateNumber} ${lang === 'en' ? 'Fitness FC expires in' : 'FC முடிவு'} ${diffDays} ${lang === 'en' ? 'days' : 'நாட்களில்'}`);
+          issues.push(`${v.plateNumber} Fitness FC expires in ${diffDays} days`);
         } else if (diffDays < 0) {
-          issues.push(`${v.plateNumber} ${lang === 'en' ? 'Fitness FC EXPIRED' : 'FC முடிந்தது'}`);
+          issues.push(`${v.plateNumber} Fitness FC EXPIRED`);
         }
       }
     });
 
     if (issues.length > 0) {
       return {
-        title: lang === 'en' ? "Fleet Attention Needed" : "வாகன கவனக் குறிப்பு",
-        description: lang === 'en' 
-          ? `${activeCount} of ${total} vehicles active. Attention needed: ${issues.join(', ')}.`
-          : `${activeCount} / ${total} வாகனங்கள் செயலில் உள்ளன. கவனத்திற்கு: ${issues.join(', ')}.`
+        title: "Fleet Attention Needed",
+        description: `${activeCount} of ${total} vehicles active. Attention needed: ${issues.join(', ')}.`
       };
     }
 
     if (maintenanceCount > 0) {
       return {
-        title: lang === 'en' ? "Fleet Partial Maintenance" : "வாகனம் பராமரிப்பு நிலை",
-        description: lang === 'en'
-          ? `${activeCount} of ${total} vehicles active, ${maintenanceCount} in maintenance.`
-          : `${activeCount} / ${total} வாகனங்கள் செயலில் உள்ளன, ${maintenanceCount} பராமரிப்பில் உள்ளன.`
+        title: "Fleet Partial Maintenance",
+        description: `${activeCount} of ${total} vehicles active, ${maintenanceCount} in maintenance.`
       };
     }
 
     return {
-      title: lang === 'en' ? "Your Fleet is Healthy" : "உங்கள் வாகனப் படை சீராக உள்ளது",
-      description: lang === 'en'
-        ? `All ${total} trucks active with up-to-date insurance, fitness & permits.`
-        : `அனைத்து ${total} வாகனங்களும் இன்சூரன்ஸ் மற்றும் எஃப்.சி உடன் சீராக இயங்குகின்றன.`
+      title: "Your Fleet is Healthy",
+      description: `All ${total} trucks active with up-to-date insurance, fitness & permits.`
     };
   };
 
