@@ -119,6 +119,17 @@ class _HomeDashboardContent extends StatelessWidget {
           ),
           Consumer<FleetViewModel>(
             builder: (context, vm, child) {
+              return IconButton(
+                icon: const Icon(Icons.tune_outlined),
+                tooltip: vm.tr('Instance & AI Config', 'அமைப்புகள்'),
+                onPressed: () {
+                  _showConfigurationDialog(context, vm);
+                },
+              );
+            },
+          ),
+          Consumer<FleetViewModel>(
+            builder: (context, vm, child) {
               final notifCount = vm.getNotifications().length;
               return IconButton(
                 icon: Badge(
@@ -143,7 +154,38 @@ class _HomeDashboardContent extends StatelessWidget {
             children: [
               // Hello Greeting Hero
               _buildHeaderCard(context, theme, fleetVM),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              // AI & Instance Configuration Hero Card
+              Card(
+                elevation: 0,
+                color: theme.colorScheme.primaryContainer.withOpacity(0.4),
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.4)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: CircleAvatar(
+                    backgroundColor: theme.colorScheme.primary,
+                    child: const Icon(Icons.tune, color: Colors.white),
+                  ),
+                  title: Text(
+                    fleetVM.tr('AI & Instance Configuration', 'AI & நிகழ்வு அமைப்பு'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  subtitle: Text(
+                    fleetVM.tr(
+                      'Instance: ${fleetVM.instanceClientId} | Provider: ${fleetVM.aiProvider.toUpperCase()}',
+                      'நிகழ்வு: ${fleetVM.instanceClientId} | AI: ${fleetVM.aiProvider.toUpperCase()}',
+                    ),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.settings),
+                  onTap: () => _showConfigurationDialog(context, fleetVM),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Fleet Portal Section
               Text(
@@ -627,6 +669,239 @@ class _HomeDashboardContent extends StatelessWidget {
                 TextButton(
                   onPressed: () => Navigator.pop(dialogCtx),
                   child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showConfigurationDialog(BuildContext context, FleetViewModel vm) {
+    final clientIdCtrl = TextEditingController(text: vm.instanceClientId);
+    final apiKeyCtrl = TextEditingController(text: vm.apiKey);
+    final modelNameCtrl = TextEditingController(text: vm.modelName);
+    final baseUrlCtrl = TextEditingController(text: vm.baseUrl);
+    String provider = vm.aiProvider;
+    bool isTesting = false;
+    String? testResultMsg;
+    bool testSuccess = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (stCtx, setStState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  const Icon(Icons.settings, color: Colors.purple),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      vm.tr('AI & Instance Configuration', 'AI & நிகழ்வு அமைப்பு'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      vm.tr('Client Instance ID (Data Persistence Scope)', 'கிளையண்ட் நிகழ்வு ஐடி'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: clientIdCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. CLIENT_001, SOUTH_ZONE_FLEET',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Text(
+                      vm.tr('AI Provider', 'AI வழங்குநர்'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      value: provider,
+                      items: const [
+                        DropdownMenuItem(value: 'gemini', child: Text('⚡ Google Gemini AI')),
+                        DropdownMenuItem(value: 'openai', child: Text('🤖 OpenAI (GPT-4o)')),
+                        DropdownMenuItem(value: 'claude', child: Text('🧠 Anthropic Claude')),
+                        DropdownMenuItem(value: 'custom', child: Text('🛠️ Custom AI / Local LLM')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setStState(() {
+                            provider = val;
+                            if (val == 'openai') modelNameCtrl.text = 'gpt-4o';
+                            else if (val == 'claude') modelNameCtrl.text = 'claude-3-5-sonnet-20241022';
+                            else if (val == 'gemini') modelNameCtrl.text = 'gemini-3.6-flash';
+                          });
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Text(
+                      vm.tr('API Key', 'API சாவி'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: apiKeyCtrl,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        hintText: provider == 'gemini' ? 'Optional (Uses server key if blank)' : 'Enter API Key...',
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Text(
+                      vm.tr('Model Name', 'மாதிரி பெயர்'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: modelNameCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. gemini-3.6-flash, gpt-4o',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (provider != 'gemini') ...[
+                      Text(
+                        vm.tr('Base URL (Optional Override)', 'தள முகவரி'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: baseUrlCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. https://api.openai.com/v1',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    if (testResultMsg != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: testSuccess ? Colors.green.shade50 : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: testSuccess ? Colors.green : Colors.red),
+                        ),
+                        child: Text(
+                          testResultMsg!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: testSuccess ? Colors.green.shade900 : Colors.red.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    OutlinedButton.icon(
+                      onPressed: isTesting ? null : () async {
+                        setStState(() {
+                          isTesting = true;
+                          testResultMsg = null;
+                        });
+                        try {
+                          final uri = Uri.parse('https://ais-dev-czqawmg62uwikhqbydfl6w-236723801382.asia-southeast1.run.app/api/chat/test');
+                          final response = await http.post(
+                            uri,
+                            headers: {'Content-Type': 'application/json'},
+                            body: jsonEncode({
+                              'provider': provider,
+                              'apiKey': apiKeyCtrl.text.trim(),
+                              'modelName': modelNameCtrl.text.trim(),
+                              'baseUrl': baseUrlCtrl.text.trim(),
+                            }),
+                          ).timeout(const Duration(seconds: 10));
+
+                          if (response.statusCode == 200) {
+                            final data = jsonDecode(response.body);
+                            setStState(() {
+                              testSuccess = data['success'] == true;
+                              testResultMsg = data['success'] == true
+                                  ? '✅ Connection Successful! Response: "${data['message']}"'
+                                  : '❌ Error: ${data['error']}';
+                            });
+                          } else {
+                            setStState(() {
+                              testSuccess = false;
+                              testResultMsg = '❌ HTTP ${response.statusCode} error testing connection';
+                            });
+                          }
+                        } catch (err) {
+                          setStState(() {
+                            testSuccess = false;
+                            testResultMsg = '❌ Connection failed: $err';
+                          });
+                        } finally {
+                          setStState(() {
+                            isTesting = false;
+                          });
+                        }
+                      },
+                      icon: isTesting ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.swap_calls, size: 16),
+                      label: Text(vm.tr('Test Connection', 'இணைப்பை சோதிக்கவும்')),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text(vm.tr('Cancel', 'ரத்து')),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    vm.updateAiConfig(
+                      newClientId: clientIdCtrl.text,
+                      newProvider: provider,
+                      newApiKey: apiKeyCtrl.text,
+                      newModelName: modelNameCtrl.text,
+                      newBaseUrl: baseUrlCtrl.text,
+                    );
+                    Navigator.pop(dialogCtx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(vm.tr('⚙️ Configuration saved successfully!', '⚙️ அமைப்புகள் சேமிக்கப்பட்டன!')),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  child: Text(vm.tr('Save Config', 'சேமிக்கவும்')),
                 ),
               ],
             );

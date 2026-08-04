@@ -105,13 +105,21 @@ If the user asks to log/add fuel, expenses, or assign a driver, output a structu
               body: jsonEncode({
                 'message': text,
                 'history': historyPayload,
+                'provider': fleetVM.aiProvider,
+                'apiKey': fleetVM.apiKey,
+                'modelName': fleetVM.modelName,
+                'baseUrl': fleetVM.baseUrl,
+                'clientId': fleetVM.instanceClientId,
               }),
             )
             .timeout(const Duration(seconds: 12));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data['response'] != null) {
+          if (data['reply'] != null) {
+            replyText = data['reply'];
+            serverSuccess = true;
+          } else if (data['response'] != null) {
             replyText = data['response'];
             serverSuccess = true;
           }

@@ -1259,7 +1259,7 @@ app.post("/api/documents/upload", async (req, res) => {
 // 11. POST to Chat with Assistant (Hybrid RAG + Direct DB context)
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, provider = 'gemini', apiKey, modelName, baseUrl } = req.body;
     if (!message) {
       return res.status(400).json({ error: "Message is required" });
     }
@@ -1353,31 +1353,121 @@ IMPORTANT DIRECTIONS:
    Ensure you infer missing variables logically (e.g. if the user says "logged fuel TN68AB1234 100L cost Rs 9000 today", the date is "${currentLocalDateStr}" and driver is "Rajesh Kumar" because he is the default assigned driver of TN68AB1234). If plate number or details are completely missing, ask the user to clarify instead of guessing blindly.
 `;
 
-    const contents = [];
-    if (history && Array.isArray(history)) {
-      history.slice(-10).forEach((h: ChatMessage) => {
-        contents.push({
-          role: h.sender === "user" ? "user" : "model",
-          parts: [{ text: h.text }]
+    let botText = "";
+
+    // Multi-provider execution logic
+    const selectedProvider = (provider || 'gemini').toLowerCase();
+    const activeApiKey = apiKey && apiKey.trim().length > 0 ? apiKey.trim() : process.env.GEMINI_API_KEY;
+
+    if (selectedProvider === 'openai' || selectedProvider === 'custom') {
+      const endpoint = baseUrl ? `${baseUrl.replace(/\/+$/, '')}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
+      const mName = modelName || 'gpt-4o';
+      
+      const reqMessages = [
+        { role: 'system', content: systemInstruction + "\n\n" + dbContext }
+      ];
+      if (history && Array.isArray(history)) {
+        history.slice(-10).forEach((h: ChatMessage) => {
+          reqMessages.push({
+            role: h.sender === 'user' ? 'user' : 'assistant',
+            content: h.text
+          });
         });
-      });
-    }
-
-    contents.push({
-      role: "user",
-      parts: [{ text: message }]
-    });
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction + "\n\n" + dbContext,
-        temperature: 0.3,
       }
-    });
+      reqMessages.push({ role: 'user', content: message });
 
-    const botText = response.text || "I'm sorry, I could not process that request.";
+      const resAi = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeApiKey || ''}`
+        },
+        body: JSON.stringify({
+          model: mName,
+          messages: reqMessages,
+          temperature: 0.3
+        })
+      });
+
+      if (!resAi.ok) {
+        const errJson = await resAi.json().catch(() => ({}));
+        throw new Error(`OpenAI/Custom API error (${resAi.status}): ${errJson?.error?.message || resAi.statusText}`);
+      }
+
+      const aiData = await resAi.json();
+      botText = aiData?.choices?.[0]?.message?.content || "No response received from OpenAI/Custom API.";
+    } else if (selectedProvider === 'claude') {
+      const endpoint = baseUrl ? `${baseUrl.replace(/\/+$/, '')}/messages` : 'https://api.anthropic.com/v1/messages';
+      const mName = modelName || 'claude-3-5-sonnet-20241022';
+
+      const reqMessages: any[] = [];
+      if (history && Array.isArray(history)) {
+        history.slice(-10).forEach((h: ChatMessage) => {
+          reqMessages.push({
+            role: h.sender === 'user' ? 'user' : 'assistant',
+            content: h.text
+          });
+        });
+      }
+      reqMessages.push({ role: 'user', content: message });
+
+      const resAi = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': activeApiKey || '',
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: mName,
+          system: systemInstruction + "\n\n" + dbContext,
+          messages: reqMessages,
+          max_tokens: 2048,
+          temperature: 0.3
+        })
+      });
+
+      if (!resAi.ok) {
+        const errJson = await resAi.json().catch(() => ({}));
+        throw new Error(`Anthropic Claude API error (${resAi.status}): ${errJson?.error?.message || resAi.statusText}`);
+      }
+
+      const aiData = await resAi.json();
+      botText = aiData?.content?.[0]?.text || "No response received from Claude API.";
+    } else {
+      // Default: Gemini
+      const mName = modelName || 'gemini-3.6-flash';
+      let aiClient = ai;
+      if (apiKey && apiKey.trim().length > 0 && apiKey !== 'YOUR_GEMINI_API_KEY') {
+        aiClient = new GoogleGenAI({ apiKey: apiKey.trim() });
+      }
+
+      const contents = [];
+      if (history && Array.isArray(history)) {
+        history.slice(-10).forEach((h: ChatMessage) => {
+          contents.push({
+            role: h.sender === "user" ? "user" : "model",
+            parts: [{ text: h.text }]
+          });
+        });
+      }
+
+      contents.push({
+        role: "user",
+        parts: [{ text: message }]
+      });
+
+      const response = await aiClient.models.generateContent({
+        model: mName,
+        contents: contents,
+        config: {
+          systemInstruction: systemInstruction + "\n\n" + dbContext,
+          temperature: 0.3,
+        }
+      });
+
+      botText = response.text || "I'm sorry, I could not process that request.";
+    }
 
     // Parse database update instructions
     let updatedDbState = false;
@@ -1553,7 +1643,81 @@ IMPORTANT DIRECTIONS:
 
   } catch (err: any) {
     console.error("Error in /api/chat:", err);
-    res.status(500).json({ error: "Gemini server-side call failed", details: err.message });
+    res.status(500).json({ error: "AI Provider call failed", details: err.message });
+  }
+});
+
+// 11b. POST to test AI Provider Connection
+app.post("/api/chat/test", async (req, res) => {
+  try {
+    const { provider = 'gemini', apiKey, modelName, baseUrl } = req.body;
+    const selectedProvider = (provider || 'gemini').toLowerCase();
+    const activeApiKey = apiKey && apiKey.trim().length > 0 ? apiKey.trim() : process.env.GEMINI_API_KEY;
+
+    if (selectedProvider === 'openai' || selectedProvider === 'custom') {
+      const endpoint = baseUrl ? `${baseUrl.replace(/\/+$/, '')}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
+      const mName = modelName || 'gpt-4o';
+      const resAi = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeApiKey || ''}`
+        },
+        body: JSON.stringify({
+          model: mName,
+          messages: [{ role: 'user', content: 'Say "Connection successful!"' }],
+          max_tokens: 30
+        })
+      });
+
+      if (!resAi.ok) {
+        const errJson = await resAi.json().catch(() => ({}));
+        return res.status(400).json({ success: false, error: `API error (${resAi.status}): ${errJson?.error?.message || resAi.statusText}` });
+      }
+
+      const aiData = await resAi.json();
+      const reply = aiData?.choices?.[0]?.message?.content || "Connected";
+      return res.json({ success: true, message: reply });
+    } else if (selectedProvider === 'claude') {
+      const endpoint = baseUrl ? `${baseUrl.replace(/\/+$/, '')}/messages` : 'https://api.anthropic.com/v1/messages';
+      const mName = modelName || 'claude-3-5-sonnet-20241022';
+      const resAi = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': activeApiKey || '',
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: mName,
+          messages: [{ role: 'user', content: 'Say "Connection successful!"' }],
+          max_tokens: 30
+        })
+      });
+
+      if (!resAi.ok) {
+        const errJson = await resAi.json().catch(() => ({}));
+        return res.status(400).json({ success: false, error: `Claude error (${resAi.status}): ${errJson?.error?.message || resAi.statusText}` });
+      }
+
+      const aiData = await resAi.json();
+      const reply = aiData?.content?.[0]?.text || "Connected";
+      return res.json({ success: true, message: reply });
+    } else {
+      // Gemini
+      const mName = modelName || 'gemini-3.6-flash';
+      let aiClient = ai;
+      if (apiKey && apiKey.trim().length > 0 && apiKey !== 'YOUR_GEMINI_API_KEY') {
+        aiClient = new GoogleGenAI({ apiKey: apiKey.trim() });
+      }
+      const response = await aiClient.models.generateContent({
+        model: mName,
+        contents: "Say 'Connection successful!'",
+      });
+      return res.json({ success: true, message: response.text || "Connected" });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || "Failed to connect to AI Provider" });
   }
 });
 

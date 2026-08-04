@@ -14,7 +14,29 @@ export const translations = {
     vault: "Document Vault",
     reminders: "Reminders",
     reports: "Reports",
+    settings: "Settings",
     
+    // Configuration & Settings
+    instanceConfig: "Instance & AI Configuration",
+    instanceConfigSub: "Configure your Client Instance ID and multi-provider AI engine (Gemini, OpenAI, Claude, or Custom Endpoint).",
+    clientIdLabel: "Client Instance ID",
+    clientIdHelp: "Data is securely saved and isolated under this Instance ID.",
+    aiProviderLabel: "AI Provider",
+    apiKeyLabel: "API Key",
+    apiKeyPlaceholder: "Paste your API key here (or leave blank for server default)",
+    modelNameLabel: "Model Name",
+    baseUrlLabel: "Base URL (Optional)",
+    baseUrlPlaceholder: "e.g., https://api.openai.com/v1 or custom proxy",
+    testConnection: "Test AI Connection",
+    testing: "Testing...",
+    saveConfig: "Save Configuration",
+    configSavedSuccess: "Configuration saved successfully!",
+    connectionSuccess: "AI Connection Successful!",
+    connectionFailed: "AI Connection Failed: ",
+    dataPersistenceNote: "Mobile App Offline Persistence: Enabled. All changes are stored locally on your device under this Instance ID.",
+    resetInstanceData: "Reset Instance Local Data",
+    resetDataWarning: "Are you sure you want to reset local data for this Instance ID?",
+
     // Home Banner & Stats
     fleetHealthy: "Your Fleet Status",
     fleetAttentionNeeded: "Fleet Attention Needed",
@@ -34,6 +56,7 @@ export const translations = {
     addDriver: "Add Driver",
     uploadDoc: "Upload Document",
     viewReports: "View Reports",
+    configureAi: "Configure AI & Instance",
     
     // Fleet / Vehicles
     vehicleManagement: "Vehicle Management",
@@ -90,6 +113,13 @@ export const translations = {
     totalMaintenanceExpense: "Total Maintenance",
     costPerKm: "Cost / km",
     
+    // Assistant Chat
+    typeMessage: "Ask anything in natural language about your fleet...",
+    send: "Send",
+    clearChat: "Clear Chat",
+    aiConnecting: "Connecting to AI Assistant...",
+    aiError: "Error connecting to assistant.",
+
     // Common
     save: "Save",
     cancel: "Cancel",
@@ -112,6 +142,28 @@ export const translations = {
     vault: "ஆவணப் பெட்டகம்",
     reminders: "நினைவூட்டல்கள்",
     reports: "அறிக்கைகள்",
+    settings: "அமைப்புகள்",
+
+    // Configuration & Settings
+    instanceConfig: "கிளையன்ட் & AI அமைப்புகள்",
+    instanceConfigSub: "உங்கள் கிளையன்ட் ஐடி மற்றும் AI வழங்குநரை (Gemini, OpenAI, Claude, அல்லது Custom) அமைக்கவும்.",
+    clientIdLabel: "கிளையன்ட் இன்ஸ்டன்ஸ் ஐடி (Client Instance ID)",
+    clientIdHelp: "இந்த ஐடியின் கீழ் உங்கள் அனைத்து தரவுகளும் தனித்தனியாக பாதுகாப்பாக சேமிக்கப்படும்.",
+    aiProviderLabel: "AI வழங்குநர் (AI Provider)",
+    apiKeyLabel: "API சாவி (API Key)",
+    apiKeyPlaceholder: "உங்கள் API சாவியை இங்கே ஒட்டவும்",
+    modelNameLabel: "மாடல் பெயர் (Model Name)",
+    baseUrlLabel: "தள முகவரி (Base URL - விருப்பத்தேர்வு)",
+    baseUrlPlaceholder: "எ.கா., https://api.openai.com/v1",
+    testConnection: "AI இணைப்பை சோதிக்கவும்",
+    testing: "சோதிக்கிறது...",
+    saveConfig: "அமைப்புகளை சேமிக்க",
+    configSavedSuccess: "அமைப்புகள் வெற்றிகரமாக சேமிக்கப்பட்டன!",
+    connectionSuccess: "AI இணைப்பு வெற்றிகரமாக முடிந்தது!",
+    connectionFailed: "AI இணைப்பு தோல்வியடைந்தது: ",
+    dataPersistenceNote: "மொபைல் ஆப் தரவு சேமிப்பு: இயக்கப்பட்டது. அனைத்து தரவுகளும் உங்கள் மொபைலில் பாதுகாப்பாக சேமிக்கப்படும்.",
+    resetInstanceData: "உள்ளூர் தரவை மீட்டமைக்க",
+    resetDataWarning: "இந்த இன்ஸ்டன்ஸ் ஐடியின் உள்ளூர் தரவை மீட்டமைக்க நிச்சயமாக விரும்புகிறீர்களா?",
     
     // Home Banner & Stats
     fleetHealthy: "உங்கள் வாகனப் படை நிலை",
@@ -132,6 +184,7 @@ export const translations = {
     addDriver: "ஓட்டுநர் சேர்க்க",
     uploadDoc: "ஆவணம் பதிவேற்ற",
     viewReports: "அறிக்கைகளைப் பார்க்க",
+    configureAi: "AI அமைப்புகளை மாற்ற",
     
     // Fleet / Vehicles
     vehicleManagement: "வாகன மேலாண்மை",
@@ -187,7 +240,14 @@ export const translations = {
     totalFuelExpense: "மொத்த டீசல் செலவு",
     totalMaintenanceExpense: "மொத்த பராமரிப்பு",
     costPerKm: "கிமீ செலவு",
-    
+
+    // Assistant Chat
+    typeMessage: "இயற்கையான தமிழில் அல்லது ஆங்கிலத்தில் உங்கள் வாகனப் கேள்விகளைக் கேட்கவும்...",
+    send: "அனுப்பு",
+    clearChat: "உரையாடலை அழிக்க",
+    aiConnecting: "AI உதவியாளருடன் இணைக்கிறது...",
+    aiError: "AI உதவியாளருடன் தொடர்பு கொள்ள முடியவில்லை.",
+
     // Common
     save: "சேமி",
     cancel: "ரத்து செய்",
@@ -198,3 +258,4 @@ export const translations = {
     loading: "ஏற்றுகிறது...",
   }
 };
+

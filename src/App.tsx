@@ -71,6 +71,17 @@ export default function App() {
   // Language Toggle State (English / Tamil)
   const [lang, setLang] = useState<Language>('en');
 
+  // Instance & Multi-Provider AI Configuration State
+  const [clientId, setClientId] = useState<string>(() => localStorage.getItem("fleet_client_id") || "CLIENT_DEFAULT");
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'claude' | 'custom'>(() => (localStorage.getItem("fleet_ai_provider") as any) || "gemini");
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem("fleet_ai_key") || "");
+  const [modelName, setModelName] = useState<string>(() => localStorage.getItem("fleet_ai_model") || "gemini-3.6-flash");
+  const [baseUrl, setBaseUrl] = useState<string>(() => localStorage.getItem("fleet_ai_base_url") || "");
+  const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+  const [isTestingConnection, setIsTestingConnection] = useState<boolean>(false);
+  const [testStatus, setTestStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [showKey, setShowKey] = useState<boolean>(false);
+
   // Mobile Simulator State
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'fleet' | 'drivers' | 'vault' | 'reminders' | 'reports'>('home');
   const [fleet, setFleet] = useState<FleetDatabase | null>(null);
@@ -916,7 +927,12 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: query,
-          history: messages
+          history: messages,
+          provider: aiProvider,
+          apiKey,
+          modelName,
+          baseUrl,
+          clientId
         })
       });
 
@@ -1276,6 +1292,21 @@ export default function App() {
                   >
                     <span>🌐</span>
                     <span>{lang === 'en' ? 'தமிழ்' : 'EN'}</span>
+                  </button>
+
+                  {/* AI & Instance Configuration Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsConfigOpen(true)}
+                    title="Instance & AI Configuration / அமைப்புகள்"
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors flex items-center gap-1 border ${
+                      isDarkMode 
+                        ? 'bg-[#2B2930] text-[#D0BCFF] border-[#49454F] hover:bg-[#36343B]' 
+                        : 'bg-[#EADDFF] text-[#21005D] border-[#CAC4D0] hover:bg-[#E8DEF8]'
+                    }`}
+                  >
+                    <span>⚙️</span>
+                    <span>{lang === 'ta' ? 'அமைப்பு' : 'AI Config'}</span>
                   </button>
 
                   {/* Theme Mode Button in App Bar */}
@@ -4653,6 +4684,232 @@ export default function App() {
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncingQueue ? 'animate-spin' : ''}`} />
                 <span>Sync Now</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI & Instance Configuration Modal */}
+      {isConfigOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl border transition-colors ${
+            isDarkMode ? 'bg-[#211F26] text-[#E6E0E9] border-[#49454F]' : 'bg-[#F7F2FA] text-[#1C1B1F] border-[#CAC4D0]'
+          }`}>
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#CAC4D0]/30 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-[#6750A4] text-white">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">
+                    {lang === 'ta' ? 'AI & நிகழ்வு அமைப்பு' : 'AI & Instance Configuration'}
+                  </h2>
+                  <p className="text-xs opacity-70">
+                    {lang === 'ta' ? 'AI மாதிரிகள் மற்றும் கிளையண்ட் தரவு அமைப்புகள்' : 'Multi-Provider AI & Client Data Storage'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsConfigOpen(false)}
+                className="p-2 rounded-full hover:bg-gray-500/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs max-h-[70vh] overflow-y-auto pr-1">
+              {/* Client Instance ID */}
+              <div className="p-3.5 rounded-2xl border border-purple-500/20 bg-purple-500/5">
+                <label className="font-bold flex items-center justify-between mb-1 text-purple-400">
+                  <span>{lang === 'ta' ? 'கிளையண்ட் நிகழ்வு ஐடி (Client Instance ID)' : 'Client Instance ID'}</span>
+                  <span className="text-[10px] font-mono opacity-80">Data Scope</span>
+                </label>
+                <input 
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => {
+                    setClientId(e.target.value);
+                    localStorage.setItem("fleet_client_id", e.target.value);
+                  }}
+                  placeholder="e.g. CLIENT_001, SOUTH_FLEET"
+                  className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-bold ${
+                    isDarkMode ? 'bg-[#1D1B20] border-[#49454F] text-white' : 'bg-white border-[#CAC4D0] text-black'
+                  }`}
+                />
+                <p className="text-[11px] opacity-70 mt-1.5 leading-relaxed">
+                  {lang === 'ta' 
+                    ? 'அனைத்து தரவுகளும் (வாகனங்கள், ஓட்டுநர்கள், ஆவணங்கள்) இந்த நிகழ்வு ஐடியில் சேமிக்கப்படும்.'
+                    : 'All fleet data, drivers, and offline records are persistent under this unique Instance ID.'}
+                </p>
+              </div>
+
+              {/* AI Provider */}
+              <div>
+                <label className="font-bold block mb-1">
+                  {lang === 'ta' ? 'AI வழங்குநர் (AI Provider)' : 'AI Provider'}
+                </label>
+                <select
+                  value={aiProvider}
+                  onChange={(e) => {
+                    const p = e.target.value as any;
+                    setAiProvider(p);
+                    localStorage.setItem("fleet_ai_provider", p);
+                    if (p === 'openai') setModelName('gpt-4o');
+                    else if (p === 'claude') setModelName('claude-3-5-sonnet-20241022');
+                    else if (p === 'gemini') setModelName('gemini-3.6-flash');
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold ${
+                    isDarkMode ? 'bg-[#1D1B20] border-[#49454F] text-white' : 'bg-white border-[#CAC4D0] text-black'
+                  }`}
+                >
+                  <option value="gemini">⚡ Google Gemini AI (Recommended)</option>
+                  <option value="openai">🤖 OpenAI (GPT-4o / GPT-4o-mini)</option>
+                  <option value="claude">🧠 Anthropic Claude (Claude 3.5 Sonnet)</option>
+                  <option value="custom">🛠️ Custom AI / Local LLM Endpoint</option>
+                </select>
+              </div>
+
+              {/* API Key */}
+              <div>
+                <label className="font-bold block mb-1">
+                  {lang === 'ta' ? 'API சாவி (API Key)' : 'API Key'}
+                </label>
+                <div className="relative">
+                  <input 
+                    type={showKey ? "text" : "password"}
+                    value={apiKey}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      localStorage.setItem("fleet_ai_key", e.target.value);
+                    }}
+                    placeholder={aiProvider === 'gemini' ? 'Optional (Uses server GEMINI_API_KEY if blank)' : 'Enter API Key...'}
+                    className={`w-full px-3 py-2 pr-10 rounded-xl border text-xs font-mono ${
+                      isDarkMode ? 'bg-[#1D1B20] border-[#49454F] text-white' : 'bg-white border-[#CAC4D0] text-black'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-white"
+                  >
+                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Model Name */}
+              <div>
+                <label className="font-bold block mb-1">
+                  {lang === 'ta' ? 'மாதிரி பெயர் (Model Name)' : 'Model Name'}
+                </label>
+                <input 
+                  type="text"
+                  value={modelName}
+                  onChange={(e) => {
+                    setModelName(e.target.value);
+                    localStorage.setItem("fleet_ai_model", e.target.value);
+                  }}
+                  placeholder="e.g. gemini-3.6-flash, gpt-4o, claude-3-5-sonnet-20241022"
+                  className={`w-full px-3 py-2 rounded-xl border text-xs font-mono ${
+                    isDarkMode ? 'bg-[#1D1B20] border-[#49454F] text-white' : 'bg-white border-[#CAC4D0] text-black'
+                  }`}
+                />
+              </div>
+
+              {/* Base URL (Optional / Custom) */}
+              {(aiProvider === 'custom' || aiProvider === 'openai' || aiProvider === 'claude') && (
+                <div>
+                  <label className="font-bold block mb-1">
+                    {lang === 'ta' ? 'தள முகவரி (Base URL - Optional)' : 'Base URL (Optional)'}
+                  </label>
+                  <input 
+                    type="text"
+                    value={baseUrl}
+                    onChange={(e) => {
+                      setBaseUrl(e.target.value);
+                      localStorage.setItem("fleet_ai_base_url", e.target.value);
+                    }}
+                    placeholder="e.g. https://api.openai.com/v1 or http://localhost:11434/v1"
+                    className={`w-full px-3 py-2 rounded-xl border text-xs font-mono ${
+                      isDarkMode ? 'bg-[#1D1B20] border-[#49454F] text-white' : 'bg-white border-[#CAC4D0] text-black'
+                    }`}
+                  />
+                </div>
+              )}
+
+              {/* Connection Status Banner */}
+              {testStatus && (
+                <div className={`p-3 rounded-2xl border text-xs font-medium flex items-center gap-2 ${
+                  testStatus.success ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-red-500/20 text-red-300 border-red-500/30'
+                }`}>
+                  {testStatus.success ? <Check className="w-4 h-4 shrink-0 text-emerald-400" /> : <X className="w-4 h-4 shrink-0 text-red-400" />}
+                  <span>{testStatus.message}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="pt-4 border-t border-[#CAC4D0]/30 mt-4 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                disabled={isTestingConnection}
+                onClick={async () => {
+                  setIsTestingConnection(true);
+                  setTestStatus(null);
+                  try {
+                    const res = await fetch("/api/chat/test", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        provider: aiProvider,
+                        apiKey,
+                        modelName,
+                        baseUrl
+                      })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      setTestStatus({ success: true, message: `✅ Connected! AI Response: "${data.message}"` });
+                    } else {
+                      setTestStatus({ success: false, message: `❌ Connection failed: ${data.error}` });
+                    }
+                  } catch (err: any) {
+                    setTestStatus({ success: false, message: `❌ Network error: ${err.message}` });
+                  } finally {
+                    setIsTestingConnection(false);
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 flex items-center gap-1.5"
+              >
+                {isTestingConnection ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                <span>{lang === 'ta' ? 'இணைப்பை சோதிக்கவும்' : 'Test AI Connection'}</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsConfigOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold hover:bg-gray-500/10"
+                >
+                  {lang === 'ta' ? 'மூடு' : 'Close'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem("fleet_client_id", clientId);
+                    localStorage.setItem("fleet_ai_provider", aiProvider);
+                    localStorage.setItem("fleet_ai_key", apiKey);
+                    localStorage.setItem("fleet_ai_model", modelName);
+                    localStorage.setItem("fleet_ai_base_url", baseUrl);
+                    triggerToast(lang === 'ta' ? "⚙️ அமைப்புகள் சேமிக்கப்பட்டன!" : "⚙️ Configuration saved successfully!");
+                    setIsConfigOpen(false);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#6750A4] hover:bg-[#523E87] text-white shadow-sm"
+                >
+                  {lang === 'ta' ? 'சேமிக்கவும்' : 'Save Config'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

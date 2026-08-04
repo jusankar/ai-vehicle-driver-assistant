@@ -9,6 +9,12 @@ class FleetViewModel extends ChangeNotifier {
   final List<ExpenseLog> _expenseLogs = [];
   final List<CloudDocument> _uploadedDocuments = [];
 
+  String instanceClientId = 'CLIENT_DEFAULT';
+  String aiProvider = 'gemini'; // 'gemini', 'openai', 'claude', 'custom'
+  String apiKey = '';
+  String modelName = 'gemini-3.6-flash';
+  String baseUrl = '';
+
   String _language = 'en';
   String get language => _language;
   bool get isTamil => _language == 'ta';
@@ -23,6 +29,21 @@ class FleetViewModel extends ChangeNotifier {
       _language = lang;
       notifyListeners();
     }
+  }
+
+  void updateAiConfig({
+    required String newClientId,
+    required String newProvider,
+    required String newApiKey,
+    required String newModelName,
+    required String newBaseUrl,
+  }) {
+    instanceClientId = newClientId.trim().isEmpty ? 'CLIENT_DEFAULT' : newClientId.trim();
+    aiProvider = newProvider;
+    apiKey = newApiKey.trim();
+    modelName = newModelName.trim().isEmpty ? (newProvider == 'openai' ? 'gpt-4o' : 'gemini-3.6-flash') : newModelName.trim();
+    baseUrl = newBaseUrl.trim();
+    notifyListeners();
   }
 
   String tr(String enText, String taText) {
