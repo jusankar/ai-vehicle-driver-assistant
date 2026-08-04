@@ -25,6 +25,7 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
+    final fleetVM = context.watch<FleetViewModel>();
     final pages = [
       _HomeDashboardContent(
         onNavigateTab: (index) {
@@ -52,36 +53,36 @@ class _HomeViewState extends State<HomeView> {
             _currentIndex = index;
           });
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Home',
+            icon: const Icon(Icons.dashboard_outlined),
+            selectedIcon: const Icon(Icons.dashboard),
+            label: fleetVM.tr('nav_home'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.local_shipping_outlined),
-            selectedIcon: Icon(Icons.local_shipping),
-            label: 'Vehicles',
+            icon: const Icon(Icons.local_shipping_outlined),
+            selectedIcon: const Icon(Icons.local_shipping),
+            label: fleetVM.tr('nav_vehicles'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.badge_outlined),
-            selectedIcon: Icon(Icons.badge),
-            label: 'Drivers',
+            icon: const Icon(Icons.badge_outlined),
+            selectedIcon: const Icon(Icons.badge),
+            label: fleetVM.tr('nav_drivers'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder),
-            label: 'Vault',
+            icon: const Icon(Icons.folder_outlined),
+            selectedIcon: const Icon(Icons.folder),
+            label: fleetVM.tr('nav_vault'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label: 'Reports',
+            icon: const Icon(Icons.bar_chart_outlined),
+            selectedIcon: const Icon(Icons.bar_chart),
+            label: fleetVM.tr('nav_reports'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'AI Chat',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            selectedIcon: const Icon(Icons.auto_awesome),
+            label: fleetVM.tr('nav_ai_chat'),
           ),
         ],
       ),
@@ -156,37 +157,6 @@ class _HomeDashboardContent extends StatelessWidget {
             children: [
               // Hello Greeting Hero
               _buildHeaderCard(context, theme, fleetVM),
-              const SizedBox(height: 16),
-
-              // AI & Instance Configuration Hero Card
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.primaryContainer.withOpacity(0.4),
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.4)),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  leading: CircleAvatar(
-                    backgroundColor: theme.colorScheme.primary,
-                    child: const Icon(Icons.tune, color: Colors.white),
-                  ),
-                  title: Text(
-                    fleetVM.tr('AI & Instance Configuration', 'AI & நிகழ்வு அமைப்பு'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                  subtitle: Text(
-                    fleetVM.tr(
-                      'Instance: ${fleetVM.instanceClientId} | Provider: ${fleetVM.aiProvider.toUpperCase()}',
-                      'நிகழ்வு: ${fleetVM.instanceClientId} | AI: ${fleetVM.aiProvider.toUpperCase()}',
-                    ),
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.settings),
-                  onTap: () => _showConfigurationDialog(context, fleetVM),
-                ),
-              ),
               const SizedBox(height: 16),
 
               // Fleet Portal Section
@@ -872,7 +842,7 @@ class _HomeDashboardContent extends StatelessWidget {
                         }
                       },
                       icon: isTesting ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.swap_calls, size: 16),
-                      label: Text(vm.tr('Test Connection', 'இணைப்பை சோதிக்கவும்')),
+                      label: Text(vm.tr('btn_test_connection')),
                     ),
                   ],
                 ),
@@ -880,7 +850,7 @@ class _HomeDashboardContent extends StatelessWidget {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogCtx),
-                  child: Text(vm.tr('Cancel', 'ரத்து')),
+                  child: Text(vm.tr('btn_cancel')),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -903,7 +873,7 @@ class _HomeDashboardContent extends StatelessWidget {
                       ),
                     );
                   },
-                  child: Text(vm.tr('Save Config', 'சேமிக்கவும்')),
+                  child: Text(vm.tr('btn_save_config')),
                 ),
               ],
             );

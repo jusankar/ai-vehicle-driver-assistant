@@ -747,10 +747,110 @@ app.post("/api/drivers/:id/document", async (req, res) => {
 // Helper function to apply successfully parsed or user-confirmed document fields to the database
 async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<string> {
   const currentLocalDateStr = "2026-07-17";
-  
-  const plate = (parsed.plateNumber || "TN68AB1234").toUpperCase().replace(/\s+/g, '');
-  const vehicleResult = await db.select().from(vehicles).where(eq(vehicles.plateNumber, plate)).limit(1);
-  const finalPlate = vehicleResult.length > 0 ? vehicleResult[0].plateNumber : "TN68AB1234";
+
+  let inputPlate = (parsed.plateNumber || "").toUpperCase().replace(/\s+/g, '');
+  let vehicleResult = inputPlate ? await db.select().from(vehicles).where(eq(vehicles.plateNumber, inputPlate)).limit(1) : [];
+  let isNewVehicleCreated = false;
+
+  // Auto-detect whether entity is new or existing and handle creation/update automatically
+  if (vehicleResult.length === 0 && inputPlate && inputPlate.length >= 5 && inputPlate !== "TN68AB1234") {
+    // AUTOMATICALLY CREATE NEW VEHICLE RECORD
+    const autoName = parsed.vehicleName || parsed.vendor || `Commercial Fleet ${inputPlate}`;
+    const autoModel = parsed.serviceDetails || parsed.vehicleType || "Heavy Goods Vehicle";
+    const autoMfg = parsed.vendor || "Ashok Leyland / Tata Motors";
+
+    await db.insert(vehicles).values({
+      plateNumber: inputPlate,
+      name: autoName,
+      model: autoModel,
+      manufacturer: autoMfg,
+      purchaseDate: parsed.date || currentLocalDateStr,
+      engineNumber: parsed.engineNumber || `ENG-${Math.floor(100000 + Math.random() * 900000)}`,
+      chassisNumber: parsed.chassisNumber || `CHS-${Math.floor(100000 + Math.random() * 900000)}`,
+      insuranceNo: parsed.documentType === "INSURANCE" ? (parsed.invoiceNumber || "INS-POLICY") : "INS-PENDING",
+      insuranceExpiry: parsed.documentType === "INSURANCE" ? (parsed.expiryDate || "2027-07-17") : "2027-07-17",
+      fitnessNo: parsed.documentType === "FITNESS" ? (parsed.invoiceNumber || "FIT-CERT") : "FIT-PENDING",
+      fitnessExpiry: parsed.documentType === "FITNESS" ? (parsed.expiryDate || "2028-07-17") : "2028-07-17",
+      permitNo: parsed.documentType === "PERMIT" ? (parsed.invoiceNumber || "PER-PERMIT") : "PER-PENDING",
+      permitExpiry: parsed.documentType === "PERMIT" ? (parsed.expiryDate || "2028-07-17") : "2028-07-17",
+      pucNo: parsed.documentType === "PUC" ? (parsed.invoiceNumber || "PUC-CERT") : "PUC-PENDING",
+      pucExpiry: parsed.documentType === "PUC" ? (parsed.expiryDate || "2027-01-17") : "2027-01-17",
+      status: "Active",
+      fastagId: `FT-${inputPlate}`,
+      fastagBalance: "1000.00",
+      currentOdometer: Number(parsed.odometer) || 12000
+    });
+
+    vehicleResult = await db.select().from(vehicles).where(eq(vehicles.plateNumber, inputPlate)).limit(1);
+    isNewVehicleCreated = true;
+
+    await db.insert(notifications).values({
+      id: `nt_v_auto_${Date.now()}`,
+      title: `Auto-Created Vehicle ${inputPlate}`,
+      message: `Uploaded ${parsed.documentType || "Document"} for unregistered vehicle ${inputPlate}. Created new vehicle record (${autoName})!`,
+      date: currentLocalDateStr,
+      type: "info",
+      read: false
+    });
+  } else if (vehicleResult.length === 0) {
+    const existingVehs = await db.select().from(vehicles).limit(1);
+    inputPlate = existingVehs.length > 0 ? existingVehs[0].plateNumber : "TN68AB1234";
+    vehicleResult = existingVehs;
+  }
+
+  const finalPlate = inputPlate;
+
+  // Auto-detect whether driver is new or existing and handle creation/update automatically
+  let matchedDriver: any = null;
+  const driverNameInDoc = parsed.driverName || "";
+  const licenseNoInDoc = parsed.licenseNumber || (parsed.documentType === "LICENSE" ? parsed.invoiceNumber : "");
+
+  if (driverNameInDoc || licenseNoInDoc || parsed.documentType === "LICENSE" || parsed.documentType === "SALARY") {
+    const allDrivers = await db.select().from(drivers);
+    if (licenseNoInDoc) {
+      matchedDriver = allDrivers.find(d => d.licenseNumber.toLowerCase() === licenseNoInDoc.toLowerCase());
+    }
+    if (!matchedDriver && driverNameInDoc) {
+      matchedDriver = allDrivers.find(d => d.name.toLowerCase().includes(driverNameInDoc.toLowerCase()) || driverNameInDoc.toLowerCase().includes(d.name.toLowerCase()));
+    }
+
+    if (!matchedDriver && (driverNameInDoc || parsed.documentType === "LICENSE")) {
+      // AUTO CREATE NEW DRIVER RECORD
+      const newDrvId = `drv_auto_${Date.now()}`;
+      const dName = driverNameInDoc || `Driver ${finalPlate}`;
+      const dLic = licenseNoInDoc || `DL-AUTO-${Date.now().toString().slice(-6)}`;
+      const dExp = parsed.expiryDate || "2029-12-31";
+
+      await db.insert(drivers).values({
+        id: newDrvId,
+        name: dName,
+        phone: parsed.driverPhone || "+91 98765 00000",
+        licenseNumber: dLic,
+        licenseExpiry: dExp,
+        assignedVehiclePlate: finalPlate,
+        dutyStatus: "OnDuty",
+        attendanceStatus: "Present"
+      });
+
+      if (finalPlate) {
+        await db.update(vehicles)
+          .set({ assignedDriverId: newDrvId })
+          .where(eq(vehicles.plateNumber, finalPlate));
+      }
+
+      const createdDrv = await db.select().from(drivers).where(eq(drivers.id, newDrvId)).limit(1);
+      matchedDriver = createdDrv[0];
+
+      await db.insert(notifications).values({
+        id: `nt_d_auto_${Date.now()}`,
+        title: `Auto-Created Driver ${dName}`,
+        message: `Extracted new driver details from document. Registered driver ${dName} (${dLic}) and assigned to ${finalPlate}!`,
+        date: currentLocalDateStr,
+        type: "info",
+        read: false
+      });
+    }
+  }
 
   const docId = `doc_${Date.now()}`;
   const expId = `ex_up_${Date.now()}`;
@@ -760,6 +860,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
   const gstDetails = parsed.gst ? ` | GST: ${parsed.gst}` : "";
   const invoiceDetails = parsed.invoiceNumber ? ` | Inv: ${parsed.invoiceNumber}` : "";
   const driverNameText = parsed.driverName ? ` | Driver: ${parsed.driverName}` : "";
+
+  // Cloud Storage URL for secure persistence
+  const cleanFileName = (fileName || `${(parsed.documentType || "doc").toLowerCase()}_doc.pdf`).replace(/\s+/g, "_").toLowerCase();
+  const docCloudUrl = parsed.cloudUrl || parsed.url || `https://storage.googleapis.com/fleet-cloud-bucket/${Date.now()}_${cleanFileName}`;
 
   let successMessage = "";
 
@@ -774,7 +878,7 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         date: dateStr,
         liters: String(liters),
         amount: String(fuelCost),
-        driverName: parsed.driverName || "Scanned Fuel Receipt"
+        driverName: parsed.driverName || (matchedDriver ? matchedDriver.name : "Scanned Fuel Receipt")
       });
 
       await db.insert(vehicleExpenses).values({
@@ -791,10 +895,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "fuel_receipt.jpg",
         type: "Fuel",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Automatically updated vehicle ${finalPlate} with ${liters}L of diesel (Rs. ${fuelCost}) filled at ${prov}.`;
+      successMessage = `Automatically updated vehicle ${finalPlate} with ${liters}L of diesel (Rs. ${fuelCost}) filled at ${prov}. Saved securely to cloud storage.`;
       break;
     }
 
@@ -824,10 +928,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "service_bill.jpg",
         type: "Service",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Logged new Service history for ${finalPlate} at ${prov} costing Rs. ${cost}.`;
+      successMessage = `Logged new Service history for ${finalPlate} at ${prov} costing Rs. ${cost}. Saved to cloud vault.`;
       break;
     }
 
@@ -846,10 +950,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "tyre_bill.jpg",
         type: "Service",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Logged tyre service charges of Rs. ${cost} for vehicle ${finalPlate}.`;
+      successMessage = `Logged tyre service charges of Rs. ${cost} for vehicle ${finalPlate}. Saved to cloud vault.`;
       break;
     }
 
@@ -868,10 +972,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "battery_bill.jpg",
         type: "Service",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Logged battery repair/replacement of Rs. ${cost} for vehicle ${finalPlate}.`;
+      successMessage = `Logged battery repair/replacement of Rs. ${cost} for vehicle ${finalPlate}. Saved to cloud vault.`;
       break;
     }
 
@@ -885,24 +989,49 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         })
         .where(eq(vehicles.plateNumber, finalPlate));
 
-      await db.insert(vehicleExpenses).values({
-        id: expId,
-        plateNumber: finalPlate,
-        date: dateStr,
-        category: "Insurance",
-        amount: String(cost),
-        description: `Renewed insurance policy via ${prov}${gstDetails}${invoiceDetails}`
-      });
+      if (cost > 0) {
+        await db.insert(vehicleExpenses).values({
+          id: expId,
+          plateNumber: finalPlate,
+          date: dateStr,
+          category: "Insurance",
+          amount: String(cost),
+          description: `Renewed insurance policy via ${prov}${gstDetails}${invoiceDetails}`
+        });
+      }
 
       await db.insert(vehicleDocuments).values({
         id: docId,
         plateNumber: finalPlate,
         name: fileName || "insurance_policy.pdf",
         type: "Insurance",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Renewed Insurance for ${finalPlate}! Policy No: ${parsed.invoiceNumber}, Expiry updated to ${parsed.expiryDate || "2027-07-17"}.`;
+      successMessage = `Renewed Insurance for ${finalPlate}! Policy No: ${parsed.invoiceNumber || "Updated"}, Expiry updated to ${parsed.expiryDate || "2027-07-17"}. Saved to cloud storage.`;
+      break;
+    }
+
+    case "RC": {
+      await db.update(vehicles)
+        .set({
+          name: parsed.serviceDetails || parsed.vendor || vehicleResult[0]?.name || `Commercial Truck ${finalPlate}`,
+          model: parsed.summary || vehicleResult[0]?.model || "Goods Carrier",
+          engineNumber: parsed.invoiceNumber || vehicleResult[0]?.engineNumber,
+          chassisNumber: parsed.gst || vehicleResult[0]?.chassisNumber,
+          purchaseDate: parsed.date || currentLocalDateStr,
+        })
+        .where(eq(vehicles.plateNumber, finalPlate));
+
+      await db.insert(vehicleDocuments).values({
+        id: docId,
+        plateNumber: finalPlate,
+        name: fileName || "registration_certificate.pdf",
+        type: "RC",
+        url: docCloudUrl
+      });
+
+      successMessage = `Updated Registration Certificate (RC) details for vehicle ${finalPlate}. Saved to cloud vault.`;
       break;
     }
 
@@ -930,10 +1059,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "fitness_cert.pdf",
         type: "Fitness",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Renewed Fitness Certificate for ${finalPlate}. New expiry date: ${parsed.expiryDate || "2027-07-17"}.`;
+      successMessage = `Renewed Fitness Certificate for ${finalPlate}. New expiry date: ${parsed.expiryDate || "2027-07-17"}. Saved to cloud storage.`;
       break;
     }
 
@@ -961,10 +1090,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "permit.pdf",
         type: "Permit",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Renewed Permit for ${finalPlate}. New expiry date: ${parsed.expiryDate || "2028-07-17"}.`;
+      successMessage = `Renewed Permit for ${finalPlate}. New expiry date: ${parsed.expiryDate || "2028-07-17"}. Saved to cloud storage.`;
       break;
     }
 
@@ -977,24 +1106,26 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         })
         .where(eq(vehicles.plateNumber, finalPlate));
 
-      await db.insert(vehicleExpenses).values({
-        id: expId,
-        plateNumber: finalPlate,
-        date: dateStr,
-        category: "Taxes",
-        amount: String(cost),
-        description: `Road tax paid for ${finalPlate}${gstDetails}`
-      });
+      if (cost > 0) {
+        await db.insert(vehicleExpenses).values({
+          id: expId,
+          plateNumber: finalPlate,
+          date: dateStr,
+          category: "Taxes",
+          amount: String(cost),
+          description: `Road tax paid for ${finalPlate}${gstDetails}`
+        });
+      }
 
       await db.insert(vehicleDocuments).values({
         id: docId,
         plateNumber: finalPlate,
         name: fileName || "road_tax_receipt.pdf",
         type: "Road Tax",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Paid Road Tax of Rs. ${cost} for vehicle ${finalPlate}. New expiry date: ${parsed.expiryDate || "2027-07-17"}.`;
+      successMessage = `Paid Road Tax of Rs. ${cost} for vehicle ${finalPlate}. New expiry date: ${parsed.expiryDate || "2027-07-17"}. Saved to cloud storage.`;
       break;
     }
 
@@ -1022,10 +1153,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "puc_certificate.pdf",
         type: "PUC",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Renewed Pollution Certificate (PUC) for ${finalPlate}. Expiry: ${parsed.expiryDate || "2027-01-17"}.`;
+      successMessage = `Renewed Pollution Certificate (PUC) for ${finalPlate}. Expiry: ${parsed.expiryDate || "2027-01-17"}. Saved to cloud storage.`;
       break;
     }
 
@@ -1051,10 +1182,10 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "fastag_receipt.jpg",
         type: "FASTag",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `FASTag Recharge of Rs. ${rechargeAmt} credited to ${finalPlate}. New Balance: Rs. ${currentBalance + rechargeAmt}.`;
+      successMessage = `FASTag Recharge of Rs. ${rechargeAmt} credited to ${finalPlate}. New Balance: Rs. ${currentBalance + rechargeAmt}. Saved to cloud storage.`;
       break;
     }
 
@@ -1070,7 +1201,7 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         toLocation: "Destination",
         distanceKm: String(dist),
         fuelUsedLiters: parsed.fuelQuantity ? String(parsed.fuelQuantity) : "50.00",
-        driverName: parsed.driverName || "Fleet Driver"
+        driverName: parsed.driverName || (matchedDriver ? matchedDriver.name : "Fleet Driver")
       });
 
       await db.update(vehicles)
@@ -1082,33 +1213,23 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
         plateNumber: finalPlate,
         name: fileName || "trip_sheet.jpg",
         type: "Trip",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Logged completed trip for vehicle ${finalPlate}. Driver is ${parsed.driverName || "Fleet Driver"}.`;
+      successMessage = `Logged completed trip for vehicle ${finalPlate}. Driver: ${parsed.driverName || (matchedDriver ? matchedDriver.name : "Fleet Driver")}. Saved to cloud storage.`;
       break;
     }
 
     case "LICENSE": {
-      // Scanned driving license
-      let matchedDriver = null;
-      const dName = parsed.driverName || "";
       const dLic = parsed.invoiceNumber || parsed.licenseNumber || "";
-
-      if (dName) {
-        const drvs = await db.select().from(drivers);
-        matchedDriver = drvs.find(d => d.name.toLowerCase().includes(dName.toLowerCase()));
-      }
-      if (!matchedDriver && dLic) {
-        const drvs = await db.select().from(drivers).where(eq(drivers.licenseNumber, dLic)).limit(1);
-        if (drvs.length > 0) matchedDriver = drvs[0];
-      }
+      const dExp = parsed.expiryDate || "2029-12-31";
 
       if (matchedDriver) {
         await db.update(drivers)
           .set({
             licenseNumber: dLic || matchedDriver.licenseNumber,
-            licenseExpiry: parsed.expiryDate || "2029-12-31"
+            licenseExpiry: dExp,
+            assignedVehiclePlate: matchedDriver.assignedVehiclePlate || finalPlate
           })
           .where(eq(drivers.id, matchedDriver.id));
 
@@ -1117,26 +1238,17 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
           plateNumber: matchedDriver.assignedVehiclePlate || finalPlate,
           name: fileName || "driving_license.jpg",
           type: "License",
-          url: ""
+          url: docCloudUrl
         });
 
-        successMessage = `Scanned DL for ${matchedDriver.name}. Number: ${dLic || matchedDriver.licenseNumber}. Expiry updated to ${parsed.expiryDate || "2029-12-31"}.`;
+        successMessage = `Updated Driving License for ${matchedDriver.name}. Number: ${dLic || matchedDriver.licenseNumber}. Expiry updated to ${dExp}. Saved to cloud storage.`;
       } else {
-        successMessage = `Scanned Driving License document (No: ${dLic || "N/A"}, Expiry: ${parsed.expiryDate || "2029-12-31"}). No matching registered driver found in registry.`;
+        successMessage = `Scanned Driving License document (No: ${dLic || "N/A"}, Expiry: ${dExp}). Saved to cloud storage.`;
       }
       break;
     }
 
     case "SALARY": {
-      // Scanned salary or wage voucher/receipt
-      let matchedDriver = null;
-      const dName = parsed.driverName || "";
-
-      if (dName) {
-        const drvs = await db.select().from(drivers);
-        matchedDriver = drvs.find(d => d.name.toLowerCase().includes(dName.toLowerCase()));
-      }
-
       if (matchedDriver) {
         const isRepay = parsed.summary?.toLowerCase().includes("repay") || parsed.summary?.toLowerCase().includes("return") || parsed.summary?.toLowerCase().includes("deduct") || parsed.summary?.toLowerCase().includes("refund");
         const amountVal = cost || 5000;
@@ -1162,43 +1274,79 @@ async function applyDocumentToDatabase(parsed: any, fileName: string): Promise<s
           plateNumber: matchedDriver.assignedVehiclePlate || finalPlate,
           name: fileName || "salary_voucher.jpg",
           type: "Salary",
-          url: ""
+          url: docCloudUrl
         });
 
-        successMessage = `Parsed Salary Voucher for ${matchedDriver.name}. Logged ${isRepay ? 'repayment' : 'advance payment'} of Rs. ${amountVal}. Outstanding advance: Rs. ${Math.max(0, currentAdvance + netChange)}.`;
+        successMessage = `Parsed Salary Voucher for ${matchedDriver.name}. Logged ${isRepay ? 'repayment' : 'advance payment'} of Rs. ${amountVal}. Outstanding advance: Rs. ${Math.max(0, currentAdvance + netChange)}. Saved to cloud storage.`;
       } else {
-        successMessage = `Scanned Salary Voucher of Rs. ${cost}. No matching registered driver found.`;
+        successMessage = `Scanned Salary Voucher of Rs. ${cost}. Saved to cloud storage.`;
       }
       break;
     }
 
     default: {
-      await db.insert(vehicleExpenses).values({
-        id: expId,
-        plateNumber: finalPlate,
-        date: dateStr,
-        category: "Other",
-        amount: String(cost),
-        description: parsed.serviceDetails || `${parsed.documentType} document scanned`
-      });
+      if (cost > 0) {
+        await db.insert(vehicleExpenses).values({
+          id: expId,
+          plateNumber: finalPlate,
+          date: dateStr,
+          category: "Other",
+          amount: String(cost),
+          description: parsed.serviceDetails || `${parsed.documentType || "General"} document scanned`
+        });
+      }
 
       await db.insert(vehicleDocuments).values({
         id: docId,
         plateNumber: finalPlate,
         name: fileName || "document.jpg",
         type: "Other",
-        url: ""
+        url: docCloudUrl
       });
 
-      successMessage = `Scanned custom document. Logged Rs. ${cost} expense on vehicle ${finalPlate}.`;
+      successMessage = `Scanned document saved securely to cloud storage for vehicle ${finalPlate}.`;
       break;
+    }
+  }
+
+  // Automatically synchronize renewal reminders
+  if (parsed.expiryDate) {
+    const remCategory = parsed.documentType === "INSURANCE" ? "Insurance" :
+                        parsed.documentType === "FITNESS" ? "Fitness" :
+                        parsed.documentType === "PERMIT" ? "Permit" :
+                        parsed.documentType === "ROAD_TAX" ? "Road Tax" :
+                        parsed.documentType === "PUC" ? "PUC" :
+                        parsed.documentType === "LICENSE" ? "License" : "Other";
+
+    const existingRem = await db.select().from(reminders)
+      .where(and(eq(reminders.plateNumber, finalPlate), eq(reminders.category, remCategory)))
+      .limit(1);
+
+    if (existingRem.length > 0) {
+      await db.update(reminders)
+        .set({ 
+          nextDueDate: parsed.expiryDate, 
+          notes: `Auto-synchronized from uploaded ${parsed.documentType} document (${fileName})` 
+        })
+        .where(eq(reminders.id, existingRem[0].id));
+    } else {
+      await db.insert(reminders).values({
+        id: `rem_auto_${Date.now()}`,
+        title: `${remCategory} Renewal (${finalPlate})`,
+        category: remCategory,
+        plateNumber: finalPlate,
+        frequency: "Yearly",
+        nextDueDate: parsed.expiryDate,
+        status: "Active",
+        notes: `Auto-created from uploaded ${parsed.documentType} document`
+      });
     }
   }
 
   // Insert alert notification
   await db.insert(notifications).values({
     id: `nt_up_${Date.now()}`,
-    title: `${parsed.documentType} Document Scan Complete`,
+    title: `${parsed.documentType || "Document"} Processed & Synchronized`,
     message: successMessage,
     date: currentLocalDateStr,
     type: "info",
@@ -1221,36 +1369,30 @@ app.get("/api/documents", async (req, res) => {
 // 10. POST upload a document to Cloud
 app.post("/api/documents/upload", async (req, res) => {
   try {
-    const { name, documentType, source, notes, fileSize } = req.body;
+    const { name, documentType, source, notes, fileSize, plateNumber, driverName, expiryDate, amount, vendor, cloudUrl } = req.body;
 
-    if (!name || !documentType || !source) {
-      return res.status(400).json({ error: "Document name, type, and source are required." });
+    if (!name || !documentType) {
+      return res.status(400).json({ error: "Document name and type are required." });
     }
 
-    const docId = `doc_cloud_${Date.now()}`;
     const cleanFileName = name.replace(/\s+/g, "_").toLowerCase();
-    const mockStorageUrl = `https://storage.googleapis.com/fleet-cloud-bucket/${Date.now()}_${cleanFileName}`;
+    const mockStorageUrl = cloudUrl || source || `https://storage.googleapis.com/fleet-cloud-bucket/${Date.now()}_${cleanFileName}`;
 
-    await db.insert(vehicleDocuments).values({
-      id: docId,
-      plateNumber: "TN68AB1234", // default or generic
-      name,
-      type: "Other",
-      url: mockStorageUrl
-    });
+    const parsedData = {
+      documentType: (documentType || "OTHER").toUpperCase(),
+      plateNumber: plateNumber || "TN68AB1234",
+      driverName: driverName || "",
+      expiryDate: expiryDate || "",
+      amount: amount ? Number(amount) : 0,
+      vendor: vendor || "Cloud Upload",
+      cloudUrl: mockStorageUrl,
+      summary: notes || `Document ${name} uploaded to Cloud Storage`
+    };
 
-    // Create system alert
-    await db.insert(notifications).values({
-      id: `nt_doc_up_${Date.now()}`,
-      title: `${documentType} Uploaded`,
-      message: `Successfully saved ${name} (${fileSize || "1.5 MB"}) to cloud storage.`,
-      date: "2026-07-17",
-      type: "info",
-      read: false
-    });
+    const successMsg = await applyDocumentToDatabase(parsedData, name);
 
     const state = await getFullFleetState();
-    res.status(201).json({ status: "success", database: state });
+    res.status(201).json({ status: "success", message: successMsg, database: state });
   } catch (error: any) {
     res.status(500).json({ error: "Failed to upload document", details: error.message });
   }

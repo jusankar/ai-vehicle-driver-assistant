@@ -462,11 +462,239 @@ class ChatMessage {
 `
   },
   {
+    path: "lib/services/localization_service.dart",
+    language: "dart",
+    content: `class LocalizationService {
+  static final Map<String, Map<String, String>> _localizedValues = {
+    'en': {
+      // Buttons
+      'btn_save': 'Save',
+      'btn_cancel': 'Cancel',
+      'btn_close': 'Close',
+      'btn_edit': 'Edit',
+      'btn_delete': 'Delete',
+      'btn_add': 'Add',
+      'btn_upload': 'Upload',
+      'btn_retry': 'Retry',
+      'btn_submit': 'Submit',
+      'btn_confirm': 'Confirm',
+      'btn_clear': 'Clear',
+      'btn_search': 'Search',
+      'btn_filter': 'Filter',
+      'btn_refresh': 'Refresh',
+      'btn_test_connection': 'Test Connection',
+      'btn_save_config': 'Save Config',
+      'btn_export_pdf': 'Export PDF',
+      'btn_export_excel': 'Export Excel',
+      'btn_view_details': 'View Details',
+      'btn_assign_driver': 'Assign Driver',
+      'btn_add_vehicle': 'Add Vehicle',
+      'btn_add_driver': 'Add Driver',
+      'btn_log_expense': 'Log Expense',
+      'btn_log_fuel': 'Log Fuel',
+      'btn_send': 'Send',
+      'btn_download': 'Download',
+      'btn_back': 'Back',
+      'btn_next': 'Next',
+      'btn_done': 'Done',
+      'btn_apply': 'Apply',
+      'btn_reset': 'Reset',
+
+      // Navigation / Tabs
+      'nav_home': 'Home',
+      'nav_vehicles': 'Vehicles',
+      'nav_drivers': 'Drivers',
+      'nav_vault': 'Doc Vault',
+      'nav_reports': 'Reports',
+      'nav_ai_chat': 'AI Assistant',
+      'nav_reminders': 'Reminders',
+      'nav_settings': 'Settings',
+
+      // Statuses
+      'status_active': 'Active',
+      'status_maintenance': 'In Maintenance',
+      'status_inactive': 'Inactive',
+      'status_onduty': 'On Duty',
+      'status_offduty': 'Off Duty',
+      'status_present': 'Present',
+      'status_absent': 'Absent',
+      'status_leave': 'On Leave',
+
+      // Headings & Labels
+      'lbl_app_title': 'AI Vehicle & Driver Assistant',
+      'lbl_total_vehicles': 'Total Vehicles',
+      'lbl_total_drivers': 'Total Drivers',
+      'lbl_active_trips': 'Active Trips',
+      'lbl_monthly_expenses': 'Monthly Expenses',
+      'lbl_fastag_balance': 'FASTag Balance',
+      'lbl_odometer': 'Odometer',
+      'lbl_insurance_expiry': 'Insurance Expiry',
+      'lbl_fitness_expiry': 'Fitness Expiry',
+      'lbl_permit_expiry': 'Permit Expiry',
+      'lbl_license_expiry': 'License Expiry',
+      'lbl_puc_expiry': 'PUC Expiry',
+      'lbl_road_tax_expiry': 'Road Tax Expiry',
+      'lbl_status': 'Status',
+      'lbl_plate_number': 'Plate Number',
+      'lbl_model': 'Model',
+      'lbl_manufacturer': 'Manufacturer',
+      'lbl_driver_name': 'Driver Name',
+      'lbl_phone': 'Phone Number',
+      'lbl_license_no': 'License Number',
+      'lbl_assigned_vehicle': 'Assigned Vehicle',
+      'lbl_documents': 'Documents',
+      'lbl_fuel_logs': 'Fuel Logs',
+      'lbl_expenses': 'Expenses',
+      'lbl_service_history': 'Service History',
+      'lbl_trip_history': 'Trip History',
+      'lbl_recent_activity': 'Recent Fleet Activity',
+      'lbl_smart_extraction': 'Smart Document Auto-Extraction',
+      'lbl_ai_config': 'AI & Instance Configuration',
+      'lbl_client_id': 'Client Instance ID',
+      'lbl_ai_provider': 'AI Provider',
+      'lbl_api_key': 'API Key',
+      'lbl_model_name': 'Model Name',
+      'lbl_base_url': 'Base URL',
+
+      // Direct string aliases for legacy code support
+      'Save': 'Save',
+      'Cancel': 'Cancel',
+      'Close': 'Close',
+      'Edit': 'Edit',
+      'Delete': 'Delete',
+      'Add Vehicle': 'Add Vehicle',
+      'Add Driver': 'Add Driver',
+      'Upload Document': 'Upload Document',
+      'Test Connection': 'Test Connection',
+      'Save Config': 'Save Config',
+      'Log Fuel': 'Log Fuel',
+      'Log Expense': 'Log Expense',
+    },
+    'ta': {
+      // Buttons
+      'btn_save': 'சேமிக்கவும்',
+      'btn_cancel': 'ரத்து செய்ய',
+      'btn_close': 'மூடுக',
+      'btn_edit': 'திருத்து',
+      'btn_delete': 'நீக்கு',
+      'btn_add': 'சேர்க்க',
+      'btn_upload': 'பதிவேற்று',
+      'btn_retry': 'மீண்டும் முயல்க',
+      'btn_submit': 'சமர்ப்பி',
+      'btn_confirm': 'உறுதிசெய்க',
+      'btn_clear': 'அழி',
+      'btn_search': 'தேடுக',
+      'btn_filter': 'வடிகட்டு',
+      'btn_refresh': 'புதுப்பி',
+      'btn_test_connection': 'இணைப்பை சோதிக்கவும்',
+      'btn_save_config': 'அமைப்புகளை சேமி',
+      'btn_export_pdf': 'PDF ஆக ஏற்றுமதி',
+      'btn_export_excel': 'Excel ஆக ஏற்றுமதி',
+      'btn_view_details': 'விவரங்களை பார்க்க',
+      'btn_assign_driver': 'ஓட்டுநரை நியமிக்க',
+      'btn_add_vehicle': 'வாகனம் சேர்க்க',
+      'btn_add_driver': 'ஓட்டுநர் சேர்க்க',
+      'btn_log_expense': 'செலவை பதிவுசெய்க',
+      'btn_log_fuel': 'எரிபொருள் பதிவுசெய்க',
+      'btn_send': 'அனுப்புக',
+      'btn_download': 'பதிவிறக்கு',
+      'btn_back': 'பின்செல்க',
+      'btn_next': 'அடுத்து',
+      'btn_done': 'முடிந்தது',
+      'btn_apply': 'பயன்படுத்து',
+      'btn_reset': 'மீட்டமை',
+
+      // Navigation / Tabs
+      'nav_home': 'முகப்பு',
+      'nav_vehicles': 'வாகனங்கள்',
+      'nav_drivers': 'ஓட்டுநர்கள்',
+      'nav_vault': 'ஆவண பெட்டகம்',
+      'nav_reports': 'அறிக்கைகள்',
+      'nav_ai_chat': 'AI உதவி',
+      'nav_reminders': 'நினைவூட்டல்கள்',
+      'nav_settings': 'அமைப்புகள்',
+
+      // Statuses
+      'status_active': 'செயலில்',
+      'status_maintenance': 'பராமரிப்பில்',
+      'status_inactive': 'செயலிழந்தது',
+      'status_onduty': 'பணியில்',
+      'status_offduty': 'பணியில் இல்லை',
+      'status_present': 'வந்துள்ளார்',
+      'status_absent': 'வரவில்லை',
+      'status_leave': 'விடுப்பில்',
+
+      // Headings & Labels
+      'lbl_app_title': 'AI வாகன & ஓட்டுநர் உதவியாளர்',
+      'lbl_total_vehicles': 'மொத்த வாகனங்கள்',
+      'lbl_total_drivers': 'மொத்த ஓட்டுநர்கள்',
+      'lbl_active_trips': 'நடப்பு பயணங்கள்',
+      'lbl_monthly_expenses': 'மாதாந்திர செலவுகள்',
+      'lbl_fastag_balance': 'FASTag இருப்பு',
+      'lbl_odometer': 'ஓடோமீட்டர்',
+      'lbl_insurance_expiry': 'காப்பீடு காலாவதி',
+      'lbl_fitness_expiry': 'தகுதிச்சான்று காலாவதி',
+      'lbl_permit_expiry': 'அனுமதி காலாவதி',
+      'lbl_license_expiry': 'ஓட்டுநர் உரிமம் காலாவதி',
+      'lbl_puc_expiry': 'புகை சோதனை சான்று காலாவதி',
+      'lbl_road_tax_expiry': 'சாலை வரி காலாவதி',
+      'lbl_status': 'நிலை',
+      'lbl_plate_number': 'வாகன எண்',
+      'lbl_model': 'மாதிரி',
+      'lbl_manufacturer': 'தயாரிப்பாளர்',
+      'lbl_driver_name': 'ஓட்டுநர் பெயர்',
+      'lbl_phone': 'தொலைபேசி எண்',
+      'lbl_license_no': 'உரிம எண்',
+      'lbl_assigned_vehicle': 'ஒதுக்கப்பட்ட வாகனம்',
+      'lbl_documents': 'ஆவணங்கள்',
+      'lbl_fuel_logs': 'எரிபொருள் பதிவுகள்',
+      'lbl_expenses': 'செலவுகள்',
+      'lbl_service_history': 'பராமரிப்பு வரலாறு',
+      'lbl_trip_history': 'பயண வரலாறு',
+      'lbl_recent_activity': 'சமீபத்திய வாகன நடவடிக்கை',
+      'lbl_smart_extraction': 'தானியங்கி ஆவணப் பிரிப்பு',
+      'lbl_ai_config': 'AI & நிகழ்வு அமைப்பு',
+      'lbl_client_id': 'கிளையண்ட் நிகழ்வு ஐடி',
+      'lbl_ai_provider': 'AI வழங்குநர்',
+      'lbl_api_key': 'API சாவி',
+      'lbl_model_name': 'மாதிரி பெயர்',
+      'lbl_base_url': 'தள முகவரி',
+
+      // Direct string aliases for legacy code support
+      'Save': 'சேமிக்கவும்',
+      'Cancel': 'ரத்து செய்ய',
+      'Close': 'மூடுக',
+      'Edit': 'திருத்து',
+      'Delete': 'நீக்கு',
+      'Add Vehicle': 'வாகனம் சேர்க்க',
+      'Add Driver': 'ஓட்டுநர் சேர்க்க',
+      'Upload Document': 'ஆவணம் பதிவேற்று',
+      'Test Connection': 'இணைப்பை சோதிக்கவும்',
+      'Save Config': 'அமைப்புகளை சேமி',
+      'Log Fuel': 'எரிபொருள் பதிவுசெய்',
+      'Log Expense': 'செலவை பதிவுசெய்க',
+    }
+  };
+
+  static String tr(String lang, String keyOrEn, {String? defaultTa}) {
+    if (_localizedValues[lang]?.containsKey(keyOrEn) == true) {
+      return _localizedValues[lang]![keyOrEn]!;
+    }
+    if (lang == 'ta') {
+      return defaultTa ?? keyOrEn;
+    }
+    return keyOrEn;
+  }
+}
+`
+  },
+  {
     path: "lib/viewmodels/fleet_viewmodel.dart",
     language: "dart",
     content: `import 'package:flutter/material.dart';
 import '../models/fleet_model.dart';
 import '../models/cloud_document.dart';
+import '../services/localization_service.dart';
 
 class FleetViewModel extends ChangeNotifier {
   final List<Vehicle> _vehicles = [];
@@ -512,8 +740,8 @@ class FleetViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String tr(String enText, String taText) {
-    return isTamil ? taText : enText;
+  String tr(String keyOrEn, [String? taText]) {
+    return LocalizationService.tr(_language, keyOrEn, defaultTa: taText);
   }
 
   List<Vehicle> get vehicles => _vehicles;
@@ -1173,6 +1401,7 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
+    final fleetVM = context.watch<FleetViewModel>();
     final pages = [
       _HomeDashboardContent(
         onNavigateTab: (index) {
@@ -1200,36 +1429,36 @@ class _HomeViewState extends State<HomeView> {
             _currentIndex = index;
           });
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Home',
+            icon: const Icon(Icons.dashboard_outlined),
+            selectedIcon: const Icon(Icons.dashboard),
+            label: fleetVM.tr('nav_home'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.local_shipping_outlined),
-            selectedIcon: Icon(Icons.local_shipping),
-            label: 'Vehicles',
+            icon: const Icon(Icons.local_shipping_outlined),
+            selectedIcon: const Icon(Icons.local_shipping),
+            label: fleetVM.tr('nav_vehicles'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.badge_outlined),
-            selectedIcon: Icon(Icons.badge),
-            label: 'Drivers',
+            icon: const Icon(Icons.badge_outlined),
+            selectedIcon: const Icon(Icons.badge),
+            label: fleetVM.tr('nav_drivers'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder),
-            label: 'Vault',
+            icon: const Icon(Icons.folder_outlined),
+            selectedIcon: const Icon(Icons.folder),
+            label: fleetVM.tr('nav_vault'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label: 'Reports',
+            icon: const Icon(Icons.bar_chart_outlined),
+            selectedIcon: const Icon(Icons.bar_chart),
+            label: fleetVM.tr('nav_reports'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'AI Chat',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            selectedIcon: const Icon(Icons.auto_awesome),
+            label: fleetVM.tr('nav_ai_chat'),
           ),
         ],
       ),
@@ -1304,37 +1533,6 @@ class _HomeDashboardContent extends StatelessWidget {
             children: [
               // Hello Greeting Hero
               _buildHeaderCard(context, theme, fleetVM),
-              const SizedBox(height: 16),
-
-              // AI & Instance Configuration Hero Card
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.primaryContainer.withOpacity(0.4),
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.4)),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  leading: CircleAvatar(
-                    backgroundColor: theme.colorScheme.primary,
-                    child: const Icon(Icons.tune, color: Colors.white),
-                  ),
-                  title: Text(
-                    fleetVM.tr('AI & Instance Configuration', 'AI & நிகழ்வு அமைப்பு'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                  subtitle: Text(
-                    fleetVM.tr(
-                      'Instance: \${fleetVM.instanceClientId} | Provider: \${fleetVM.aiProvider.toUpperCase()}',
-                      'நிகழ்வு: \${fleetVM.instanceClientId} | AI: \${fleetVM.aiProvider.toUpperCase()}',
-                    ),
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.settings),
-                  onTap: () => _showConfigurationDialog(context, fleetVM),
-                ),
-              ),
               const SizedBox(height: 16),
 
               // Fleet Portal Section
@@ -2020,7 +2218,7 @@ class _HomeDashboardContent extends StatelessWidget {
                         }
                       },
                       icon: isTesting ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.swap_calls, size: 16),
-                      label: Text(vm.tr('Test Connection', 'இணைப்பை சோதிக்கவும்')),
+                      label: Text(vm.tr('btn_test_connection')),
                     ),
                   ],
                 ),
@@ -2028,7 +2226,7 @@ class _HomeDashboardContent extends StatelessWidget {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogCtx),
-                  child: Text(vm.tr('Cancel', 'ரத்து')),
+                  child: Text(vm.tr('btn_cancel')),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -2051,7 +2249,7 @@ class _HomeDashboardContent extends StatelessWidget {
                       ),
                     );
                   },
-                  child: Text(vm.tr('Save Config', 'சேமிக்கவும்')),
+                  child: Text(vm.tr('btn_save_config')),
                 ),
               ],
             );

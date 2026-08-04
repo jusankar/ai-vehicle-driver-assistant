@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/fleet_model.dart';
 import '../models/cloud_document.dart';
+import '../services/localization_service.dart';
 
 class FleetViewModel extends ChangeNotifier {
   final List<Vehicle> _vehicles = [];
@@ -46,8 +47,8 @@ class FleetViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String tr(String enText, String taText) {
-    return isTamil ? taText : enText;
+  String tr(String keyOrEn, [String? taText]) {
+    return LocalizationService.tr(_language, keyOrEn, defaultTa: taText);
   }
 
   List<Vehicle> get vehicles => _vehicles;
